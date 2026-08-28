@@ -50,8 +50,7 @@ The client accepts schema version `1`. Each version is dynamic and must supply i
       "fileName": "certificate.cer",
       "urls": ["https://cdn.erasemc.com/minecraft/1.16.100/certificate.cer"],
       "sha256": "64-character SHA-256",
-      "size": 1234,
-      "pfx": { "fileName": "certificate.pfx", "urls": ["https://cdn.erasemc.com/minecraft/1.16.100/certificate.pfx"], "sha256": "64-character SHA-256", "size": 1234 }
+      "size": 1234
     },
     "dependencies": []
   }]
@@ -64,9 +63,9 @@ Every URL must be HTTPS, every filename must be a filename only (not a path), an
 
 The production endpoint is `https://cdn.erasemc.com/manifest.json`; normal installation never uses GitHub. CDN payloads are external deployment artifacts and are intentionally not committed to this repository.
 
-The current server inspection found no Nginx installation or `/var/www` document root, and the `erase` account does not have passwordless sudo. As a result, CDN deployment has not been attempted. The public endpoint currently returns Cloudflare 521. This is an infrastructure blocker, not a client-side fallback condition.
+The CDN is served by Nginx with HTTPS, automatic certificate renewal and byte-range support. Its payloads and manifest are deployment artifacts, not repository files. The live manifest lists Minecraft Bedrock `1.16.100` and `1.18.12`, with their package, certificate and prerequisite hashes generated from the deployed files.
 
-Before deployment, the server needs privileged access for the agreed deployment account or a separate administrator-operated setup. Files and real hashes must then be deployed together, the manifest validated, Nginx checked with `nginx -t`, and all public endpoints including range requests verified from Windows.
+The live deployment uses public `.cer` signing certificates only. A `.pfx` is optional in the client schema, but private-key material must not be published to the CDN or committed to source control. Each deployment must validate the JSON, run `nginx -t`, and verify the public manifest and a ranged package response before it is considered ready.
 
 ## Publishing
 
