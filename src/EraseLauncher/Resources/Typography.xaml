@@ -6,8 +6,14 @@
     <Style x:Key="Type.PageTitle" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource Font.Display}" />
         <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="FontSize" Value="32" />
+        <Setter Property="FontSize" Value="34" />
         <Setter Property="Foreground" Value="{StaticResource Brush.Text}" />
+    </Style>
+    <Style x:Key="Type.Eyebrow" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource Font.Body}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Foreground" Value="{StaticResource Brush.TextMuted}" />
     </Style>
     <Style x:Key="Type.SectionTitle" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource Font.Display}" />
