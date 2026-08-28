@@ -11,8 +11,9 @@
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderBrush" Value="Transparent" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="Padding" Value="16,0" />
-        <Setter Property="Height" Value="48" />
+        <Setter Property="Padding" Value="18,0" />
+        <Setter Property="Height" Value="52" />
+        <Setter Property="MinWidth" Value="112" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Template">
             <Setter.Value>
@@ -21,8 +22,8 @@
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Root" Property="Opacity" Value="0.88" /></Trigger>
-                        <Trigger Property="IsPressed" Value="True"><Setter TargetName="Root" Property="Opacity" Value="0.72" /></Trigger>
+                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Root" Property="Opacity" Value="0.9" /></Trigger>
+                        <Trigger Property="IsPressed" Value="True"><Setter TargetName="Root" Property="Opacity" Value="0.76" /></Trigger>
                         <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Root" Property="Opacity" Value="0.42" /></Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Root" Property="BorderBrush" Value="{StaticResource Brush.AccentHover}" /></Trigger>
                     </ControlTemplate.Triggers>
@@ -33,10 +34,12 @@
     <Style x:Key="Button.Primary" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
         <Setter Property="Background" Value="{StaticResource Brush.Accent}" />
         <Setter Property="Foreground" Value="{StaticResource Brush.AccentDark}" />
+        <Setter Property="FontWeight" Value="Bold" />
     </Style>
     <Style x:Key="Button.Secondary" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
         <Setter Property="Background" Value="#B3151A14" />
         <Setter Property="BorderBrush" Value="{StaticResource Brush.Border}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
     <Style x:Key="Button.Navigation" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
         <Setter Property="HorizontalContentAlignment" Value="Left" />

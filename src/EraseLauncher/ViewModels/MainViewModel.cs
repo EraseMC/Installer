@@ -15,6 +15,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly LoggingService _log;
     private CancellationTokenSource? _installationCancellation;
     private LauncherPage _currentPage = LauncherPage.Home;
+    private SettingsSection _settingsSection = SettingsSection.General;
     private string _manifestStatus = "Checking Erase CDN…";
     private string _installedVersion = "Minecraft not detected";
     private string _installationMessage = "Waiting to start.";
@@ -40,6 +41,7 @@ public sealed class MainViewModel : ObservableObject
         _log = log;
 
         NavigateCommand = new RelayCommand<LauncherPage>(page => CurrentPage = page);
+        NavigateSettingsCommand = new RelayCommand<SettingsSection>(section => SettingsSection = section);
         OpenInstallCommand = new RelayCommand<VersionCardViewModel>(OpenInstallConfirmation, version => version is not null && !IsBusy);
         ConfirmInstallCommand = new RelayCommand(() => _ = InstallAsync(), () => SelectedVersion is not null && !IsBusy);
         CancelConfirmationCommand = new RelayCommand(() => IsConfirmationOpen = false);
@@ -55,6 +57,7 @@ public sealed class MainViewModel : ObservableObject
 
     public ObservableCollection<VersionCardViewModel> Versions { get; } = [];
     public ICommand NavigateCommand { get; }
+    public ICommand NavigateSettingsCommand { get; }
     public ICommand OpenInstallCommand { get; }
     public ICommand ConfirmInstallCommand { get; }
     public ICommand CancelConfirmationCommand { get; }
@@ -88,6 +91,25 @@ public sealed class MainViewModel : ObservableObject
     public bool IsVersions => CurrentPage == LauncherPage.Versions;
     public bool IsSettings => CurrentPage == LauncherPage.Settings;
     public bool IsInstallation => CurrentPage == LauncherPage.Installation;
+    public SettingsSection SettingsSection
+    {
+        get => _settingsSection;
+        private set
+        {
+            if (!SetProperty(ref _settingsSection, value))
+            {
+                return;
+            }
+
+            OnPropertyChanged(nameof(IsGeneralSettings));
+            OnPropertyChanged(nameof(IsDownloadsSettings));
+            OnPropertyChanged(nameof(IsAboutSettings));
+        }
+    }
+
+    public bool IsGeneralSettings => SettingsSection == global::EraseLauncher.ViewModels.SettingsSection.General;
+    public bool IsDownloadsSettings => SettingsSection == global::EraseLauncher.ViewModels.SettingsSection.Downloads;
+    public bool IsAboutSettings => SettingsSection == global::EraseLauncher.ViewModels.SettingsSection.About;
     public string ManifestStatus { get => _manifestStatus; private set => SetProperty(ref _manifestStatus, value); }
     public string InstalledVersion { get => _installedVersion; private set => SetProperty(ref _installedVersion, value); }
     public bool HasInstalledMinecraft { get; private set; }
