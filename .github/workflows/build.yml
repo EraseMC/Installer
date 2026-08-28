@@ -20,3 +20,14 @@ jobs:
         run: dotnet build src/EraseLauncher/EraseLauncher.csproj -c Release --no-restore
       - name: Test
         run: dotnet test tests/EraseLauncher.Tests/EraseLauncher.Tests.csproj -c Release --no-restore
+      - name: Publish launcher
+        if: github.event_name == 'push'
+        run: dotnet publish src/EraseLauncher/EraseLauncher.csproj -c Release -r win-x64 --self-contained true -o artifacts/win-x64
+      - name: Upload launcher
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: EraseLauncher-win-x64
+          path: artifacts/win-x64/EraseLauncher.exe
+          if-no-files-found: error
+          retention-days: 30
