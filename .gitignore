@@ -1,0 +1,25 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+[Tt]est[Rr]esult*/
+.dotnet/
+
+# IDEs
+.vs/
+.idea/
+*.user
+*.suo
+
+# Local application data
+artifacts/
+logs/
+cache/
+backups/
+*.partial
+
+# Certificates and secrets
+*.pfx
+*.p12
+*.key
+*.pem
+appsettings.Development.json
