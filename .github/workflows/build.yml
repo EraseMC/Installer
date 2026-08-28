@@ -3,8 +3,12 @@ name: build
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
     branches: [main]
+
+permissions:
+  contents: write
 
 jobs:
   verify:
@@ -31,3 +35,19 @@ jobs:
           path: artifacts/win-x64/EraseLauncher.exe
           if-no-files-found: error
           retention-days: 30
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: verify
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Publish launcher
+        run: dotnet publish src/EraseLauncher/EraseLauncher.csproj -c Release -r win-x64 --self-contained true -o artifacts/release
+      - name: Create release
+        run: gh release create $env:GITHUB_REF_NAME artifacts/release/EraseLauncher.exe --title "Erase Launcher $env:GITHUB_REF_NAME" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
