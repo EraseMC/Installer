@@ -4,7 +4,7 @@ public sealed class PackageService(PowerShellRunner powerShell)
 {
     public async Task<bool> IsInstalledAsync(string packageFamilyName, CancellationToken cancellationToken)
     {
-        var command = $"if (Get-AppxPackage -PackageFamilyName {PowerShellRunner.Quote(packageFamilyName)}) {{ 'true' }}";
+        var command = $"$package = Get-AppxPackage | Where-Object {{ $_.PackageFamilyName -eq {PowerShellRunner.Quote(packageFamilyName)} }}; if ($null -ne $package) {{ 'true' }}";
         return string.Equals(await powerShell.RunAsync(command, cancellationToken), "true", StringComparison.OrdinalIgnoreCase);
     }
 

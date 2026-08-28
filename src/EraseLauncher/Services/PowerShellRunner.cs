@@ -17,7 +17,9 @@ public sealed class PowerShellRunner(LoggingService log)
         var error = await errorTask;
         if (process.ExitCode != 0)
         {
-            throw new InvalidOperationException(string.IsNullOrWhiteSpace(error) ? "A Windows package operation failed." : error.Trim());
+            var rawError = string.IsNullOrWhiteSpace(error) ? output : error;
+            await log.InfoAsync($"PowerShell operation failed: {rawError}", CancellationToken.None);
+            throw new InvalidOperationException(ToUserMessage(rawError));
         }
 
         return output.Trim();
@@ -40,7 +42,8 @@ public sealed class PowerShellRunner(LoggingService log)
 
     private static ProcessStartInfo CreateStartInfo(string script, bool elevated)
     {
-        var encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes("$ErrorActionPreference='Stop'; " + script));
+        var preamble = "$ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'; $InformationPreference='SilentlyContinue'; ";
+        var encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(preamble + script));
         return new ProcessStartInfo("powershell.exe")
         {
             UseShellExecute = elevated,
@@ -49,7 +52,18 @@ public sealed class PowerShellRunner(LoggingService log)
             RedirectStandardOutput = !elevated,
             RedirectStandardError = !elevated,
             CreateNoWindow = !elevated,
-            Arguments = $"-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand {encoded}"
+            Arguments = $"-NoProfile -NonInteractive -OutputFormat Text -ExecutionPolicy Bypass -EncodedCommand {encoded}"
         };
+    }
+
+    private static string ToUserMessage(string rawError)
+    {
+        if (rawError.Contains("CLIXML", StringComparison.OrdinalIgnoreCase) ||
+            rawError.Contains("System.Management.Automation", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Windows package check failed. Restart Erase Launcher and try again.";
+        }
+
+        return string.IsNullOrWhiteSpace(rawError) ? "A Windows package operation failed." : rawError.Trim();
     }
 }
