@@ -21,7 +21,7 @@ The target production builds are Minecraft Bedrock `1.16.100` and `1.18.12`. Ava
 
 - Windows 10 or Windows 11, x64
 - Internet access to `cdn.erasemc.com`
-- Permission to approve Windows UAC only when installing certificates or APPX packages
+- Permission to approve Windows UAC once, when the package certificate is not yet trusted
 
 ## Installation
 

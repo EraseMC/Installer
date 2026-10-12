@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using EraseLauncher.Models;
 
 namespace EraseLauncher.Services;
@@ -9,117 +10,183 @@ public sealed class InstallationService(
     BackupService backupService,
     LoggingService log)
 {
+    private static readonly TimeSpan ReportInterval = TimeSpan.FromMilliseconds(60);
+
     public async Task InstallAsync(InstallationRequest request, IProgress<InstallationProgress> progress, CancellationToken cancellationToken)
     {
+        var version = request.Version;
+        var reporter = new Reporter(progress);
         string? backupPath = null;
-        var lastState = InstallationState.Idle;
         try
         {
-            Report(InstallationState.Preparing, "Preparing installation.");
+            reporter.Report(InstallationState.Preparing, "Preparing installation");
             cancellationToken.ThrowIfCancellationRequested();
-            EnsureAvailableDiskSpace(request.Version);
+            EnsureAvailableDiskSpace(version);
 
-            Report(InstallationState.CheckingPrerequisites, "Checking Minecraft and Windows package requirements.");
+            reporter.Report(InstallationState.CheckingPrerequisites, "Checking Windows components");
             if (minecraftService.IsRunning())
             {
                 throw new InvalidOperationException("Close Minecraft before changing its version.");
             }
 
-            var downloadedDependencies = new List<(DependencyArtifact Artifact, string Path)>();
-            foreach (var dependency in request.Version.Dependencies)
+            var missingDependencies = new List<DependencyArtifact>();
+            foreach (var dependency in version.Dependencies)
             {
-                if (!string.IsNullOrWhiteSpace(dependency.PackageFamilyName) && await packageService.IsInstalledAsync(dependency.PackageFamilyName, cancellationToken))
+                if (string.IsNullOrWhiteSpace(dependency.PackageFamilyName) ||
+                    !await packageService.IsInstalledAsync(dependency.PackageFamilyName, cancellationToken))
                 {
-                    continue;
-                }
-
-                Report(InstallationState.DownloadingDependencies, $"Downloading {dependency.FileName}.");
-                var path = await downloadService.DownloadVerifiedAsync(dependency, CreateDownloadProgress(InstallationState.DownloadingDependencies, $"Downloading {dependency.FileName}.", progress), cancellationToken);
-                downloadedDependencies.Add((dependency, path));
-            }
-
-            Report(InstallationState.DownloadingPackage, $"Downloading Minecraft {request.Version.Id}.");
-            var packagePath = await downloadService.DownloadVerifiedAsync(request.Version.Package, CreateDownloadProgress(InstallationState.DownloadingPackage, "Downloading Minecraft.", progress), cancellationToken);
-
-            string? certificatePath = null;
-            string? pfxPath = null;
-            if (request.Version.Certificate is not null)
-            {
-                Report(InstallationState.Verifying, "Preparing the signing certificate.");
-                certificatePath = await downloadService.DownloadVerifiedAsync(request.Version.Certificate, CreateDownloadProgress(InstallationState.Verifying, "Downloading certificate.", progress), cancellationToken);
-                if (request.Version.Certificate.Pfx is not null)
-                {
-                    pfxPath = await downloadService.DownloadVerifiedAsync(request.Version.Certificate.Pfx, CreateDownloadProgress(InstallationState.Verifying, "Downloading certificate material.", progress), cancellationToken);
+                    missingDependencies.Add(dependency);
                 }
             }
+
+            var existing = await minecraftService.GetInstallationAsync(cancellationToken);
+            var packageArtifacts = new List<DownloadArtifact> { version.Package };
+            if (version.Certificate is not null)
+            {
+                packageArtifacts.Add(version.Certificate);
+                if (version.Certificate.Pfx is not null)
+                {
+                    packageArtifacts.Add(version.Certificate.Pfx);
+                }
+            }
+
+            reporter.Plan = InstallationProgressPlan.Create(new InstallationPlanOptions(
+                DependencyBytes: missingDependencies.Sum(dependency => dependency.Size),
+                PackageBytes: packageArtifacts.Sum(artifact => artifact.Size),
+                BackupData: request.PreserveData,
+                InstallCertificate: version.Certificate is not null,
+                DependencyCount: missingDependencies.Count,
+                RemoveExisting: existing is not null));
+            reporter.Report(InstallationState.CheckingPrerequisites, "Checking Windows components", 1);
+
+            var dependencyPaths = await DownloadAllAsync(InstallationState.DownloadingDependencies, "Downloading Windows components", missingDependencies, reporter, cancellationToken);
+            var packagePaths = await DownloadAllAsync(InstallationState.DownloadingPackage, $"Downloading Minecraft {version.Id}", packageArtifacts, reporter, cancellationToken);
+            var packagePath = packagePaths[0];
+            var certificatePath = version.Certificate is not null ? packagePaths[1] : null;
+            var pfxPath = version.Certificate?.Pfx is not null ? packagePaths[2] : null;
 
             if (request.PreserveData)
             {
-                Report(InstallationState.BackingUp, "Backing up Minecraft worlds and packs.");
-                backupPath = await Task.Run(backupService.Backup, cancellationToken);
+                const string message = "Backing up worlds and packs";
+                reporter.Report(InstallationState.BackingUp, message);
+                backupPath = await Task.Run(() => backupService.Backup(reporter.For(InstallationState.BackingUp, message)), cancellationToken);
                 await log.InfoAsync(backupPath is null ? "No Minecraft data was present to back up." : $"Minecraft data backup created at {backupPath}.", cancellationToken);
             }
 
             if (certificatePath is not null)
             {
-                Report(InstallationState.InstallingCertificate, "Installing the package certificate. Windows may ask for approval.");
+                reporter.Report(InstallationState.InstallingCertificate, "Trusting the package certificate. Windows may ask for approval.");
                 await packageService.InstallCertificateAsync(certificatePath, pfxPath, cancellationToken);
             }
 
-            foreach (var (_, dependencyPath) in downloadedDependencies)
+            for (var index = 0; index < dependencyPaths.Count; index++)
             {
-                Report(InstallationState.InstallingDependencies, "Installing required Windows components.");
-                await packageService.InstallPackageAsync(dependencyPath, cancellationToken);
+                var message = $"Installing Windows components ({index + 1} of {dependencyPaths.Count})";
+                var offset = index;
+                var count = dependencyPaths.Count;
+                reporter.Report(InstallationState.InstallingDependencies, message, (double)index / count);
+                await packageService.InstallPackageAsync(
+                    dependencyPaths[index],
+                    isMinecraft: false,
+                    new SyncProgress<double>(value => reporter.Update(InstallationState.InstallingDependencies, message, (offset + value) / count)),
+                    cancellationToken);
             }
 
-            var existing = await minecraftService.GetInstallationAsync(cancellationToken);
+            // Past this point the current package is being replaced. Cancelling halfway
+            // would leave no Minecraft installed, so the remaining steps always finish.
+            reporter.CanCancel = false;
+            cancellationToken.ThrowIfCancellationRequested();
+
             if (existing is not null)
             {
-                Report(InstallationState.RemovingExistingVersion, "Replacing the currently installed Minecraft package.");
-                await packageService.RemoveMinecraftAsync(cancellationToken);
+                const string message = "Removing the current Minecraft version";
+                reporter.Report(InstallationState.RemovingExistingVersion, message);
+                await packageService.RemoveMinecraftAsync(reporter.For(InstallationState.RemovingExistingVersion, message), CancellationToken.None);
             }
 
-            Report(InstallationState.InstallingMinecraft, $"Installing Minecraft {request.Version.Id}.");
-            await packageService.InstallPackageAsync(packagePath, cancellationToken);
+            var installMessage = $"Installing Minecraft {version.Id}";
+            reporter.Report(InstallationState.InstallingMinecraft, installMessage);
+            await packageService.InstallPackageAsync(packagePath, isMinecraft: true, reporter.For(InstallationState.InstallingMinecraft, installMessage), CancellationToken.None);
 
-            Report(InstallationState.VerifyingInstallation, "Verifying the installed Minecraft package.");
-            var installed = await minecraftService.GetInstallationAsync(cancellationToken);
-            if (installed is null || !VersionService.MatchesMinecraftBuild(installed.Version, request.Version.Id))
+            reporter.Report(InstallationState.VerifyingInstallation, "Verifying the installation");
+            var installed = await minecraftService.GetInstallationAsync(CancellationToken.None);
+            if (installed is null || !VersionService.MatchesMinecraftBuild(installed.Version, version.Id))
             {
                 throw new InvalidOperationException("Minecraft was installed, but Windows did not report the expected version.");
             }
 
             if (backupPath is not null)
             {
-                Report(InstallationState.RestoringData, "Restoring Minecraft worlds and packs.");
-                await Task.Run(() => backupService.Restore(backupPath), cancellationToken);
+                const string message = "Restoring worlds and packs";
+                reporter.Report(InstallationState.RestoringData, message);
+                await Task.Run(() => backupService.Restore(backupPath, reporter.For(InstallationState.RestoringData, message)), CancellationToken.None);
             }
 
-            Report(InstallationState.Finalizing, "Finalizing installation.");
-            Report(InstallationState.Completed, $"Minecraft {request.Version.Id} installed successfully.", 100);
+            reporter.Report(InstallationState.Finalizing, "Finishing up");
+            await log.InfoAsync($"Installed Minecraft {version.Id}.", CancellationToken.None);
+            reporter.Report(InstallationState.Completed, $"Minecraft {version.Id} is ready to play");
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            Report(InstallationState.Cancelled, "Installation cancelled.");
+            reporter.Report(InstallationState.Cancelled, "Installation cancelled");
             throw;
         }
         catch (Exception exception)
         {
             await log.InfoAsync($"Installation failed: {exception}", CancellationToken.None);
-            Report(InstallationState.Failed, exception.Message);
-            throw;
-        }
-
-        void Report(InstallationState state, string message, double? percentage = null)
-        {
-            if (!InstallationStateMachine.CanTransition(lastState, state))
+            var message = exception.Message;
+            if (backupPath is not null && !reporter.CanCancel)
             {
-                throw new InvalidOperationException($"Invalid installation-state transition: {lastState} to {state}.");
+                message += $" Your worlds and packs are saved in {backupPath}.";
             }
 
-            lastState = state;
-            progress.Report(new InstallationProgress(state, message, percentage));
+            reporter.Report(InstallationState.Failed, message);
+            throw new InstallationException(message, exception);
         }
+    }
+
+    private async Task<List<string>> DownloadAllAsync(
+        InstallationState state,
+        string message,
+        IReadOnlyList<DownloadArtifact> artifacts,
+        Reporter reporter,
+        CancellationToken cancellationToken)
+    {
+        var paths = new List<string>(artifacts.Count);
+        if (artifacts.Count == 0)
+        {
+            return paths;
+        }
+
+        // Each byte is downloaded once and hashed once; hashing is much faster, so it
+        // gets a smaller share of the state's progress.
+        const double hashShare = 0.12;
+        var totalBytes = Math.Max(1, artifacts.Sum(artifact => artifact.Size));
+        long completedBytes = 0;
+        reporter.Report(state, message);
+
+        foreach (var artifact in artifacts)
+        {
+            var offset = completedBytes;
+            var artifactProgress = new SyncProgress<DownloadProgress>(download =>
+            {
+                var stageFraction = artifact.Size > 0 ? Math.Clamp((double)download.BytesReceived / artifact.Size, 0, 1) : 0;
+                var artifactFraction = download.Stage == TransferStage.Downloading
+                    ? stageFraction * (1 - hashShare)
+                    : 1 - hashShare + stageFraction * hashShare;
+                var done = offset + artifactFraction * artifact.Size;
+                var aggregate = download.Stage == TransferStage.Downloading
+                    ? new DownloadProgress(offset + download.BytesReceived, totalBytes, download.BytesPerSecond)
+                    : new DownloadProgress(offset + download.BytesReceived, totalBytes, 0, TransferStage.Verifying);
+                reporter.Update(state, message, done / totalBytes, aggregate);
+            });
+
+            paths.Add(await downloadService.DownloadVerifiedAsync(artifact, artifactProgress, cancellationToken));
+            completedBytes += artifact.Size;
+        }
+
+        reporter.Report(state, message, 1);
+        return paths;
     }
 
     private static void EnsureAvailableDiskSpace(MinecraftVersion version)
@@ -134,10 +201,71 @@ public sealed class InstallationService(
         }
     }
 
-    private static IProgress<DownloadProgress> CreateDownloadProgress(
-        InstallationState state,
-        string message,
-        IProgress<InstallationProgress> installationProgress) =>
-        new Progress<DownloadProgress>(download =>
-            installationProgress.Report(new InstallationProgress(state, message, download.Percentage, download)));
+    /// <summary>
+    /// Validates state transitions, keeps the overall percentage monotonic and
+    /// throttles repeated updates of the same state so the UI is not flooded.
+    /// </summary>
+    private sealed class Reporter(IProgress<InstallationProgress> progress)
+    {
+        private readonly object _gate = new();
+        private readonly Stopwatch _sinceReport = Stopwatch.StartNew();
+        private InstallationState _state = InstallationState.Idle;
+        private double _percentage;
+
+        public InstallationProgressPlan Plan { get; set; } = InstallationProgressPlan.Initial;
+        public bool CanCancel { get; set; } = true;
+
+        public IProgress<double> For(InstallationState state, string message) =>
+            new SyncProgress<double>(fraction => Update(state, message, fraction));
+
+        /// <summary>Moves to a state. Called from the installation flow only.</summary>
+        public void Report(InstallationState state, string message, double fraction = 0)
+        {
+            lock (_gate)
+            {
+                if (state != _state)
+                {
+                    if (!InstallationStateMachine.CanTransition(_state, state))
+                    {
+                        throw new InvalidOperationException($"Invalid installation-state transition: {_state} to {state}.");
+                    }
+
+                    _state = state;
+                }
+
+                Publish(state, message, fraction, null);
+            }
+        }
+
+        /// <summary>
+        /// Progress inside the current state. Callbacks can arrive late from worker
+        /// threads, so updates for a state that has already ended are dropped.
+        /// </summary>
+        public void Update(InstallationState state, string message, double fraction, DownloadProgress? download = null)
+        {
+            lock (_gate)
+            {
+                if (state != _state || fraction < 1 && _sinceReport.Elapsed < ReportInterval)
+                {
+                    return;
+                }
+
+                Publish(state, message, fraction, download);
+            }
+        }
+
+        private void Publish(InstallationState state, string message, double fraction, DownloadProgress? download)
+        {
+            if (state is not (InstallationState.Failed or InstallationState.Cancelled))
+            {
+                _percentage = Math.Max(_percentage, Plan.GetPercentage(state, fraction));
+            }
+
+            _sinceReport.Restart();
+            var canCancel = CanCancel && state is not (InstallationState.Completed or InstallationState.Failed or InstallationState.Cancelled);
+            progress.Report(new InstallationProgress(state, message, _percentage, download, canCancel));
+        }
+    }
 }
+
+public sealed class InstallationException(string message, Exception innerException) : Exception(message, innerException);

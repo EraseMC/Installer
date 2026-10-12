@@ -82,7 +82,7 @@ public sealed class CoreServiceTests
             Size = content.Length,
             Urls = ["https://primary.invalid/file", "https://backup.invalid/file"]
         };
-        var service = new DownloadService(client, new HashService(), new LoggingService());
+        var service = new DownloadService(client, new HashService(), new LoggingService()) { RetryDelay = _ => TimeSpan.Zero };
 
         var path = await service.DownloadVerifiedAsync(artifact, null, CancellationToken.None);
 

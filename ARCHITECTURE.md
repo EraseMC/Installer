@@ -4,7 +4,7 @@
 
 Erase Launcher uses WPF on .NET 8 for a small, self-contained Windows 10/11 x64 application. WPF is deliberately chosen over WinUI 3 here: it provides predictable self-contained deployment without a Windows App SDK bootstrapper, while still allowing a fully custom DPI-aware interface.
 
-The application starts as a normal user. Only certificate import and Windows package deployment request UAC through an elevated, narrowly scoped PowerShell process. The launcher never changes Defender, SmartScreen, certificate validation, or system-wide security settings.
+The application starts as a normal user. Packages are deployed and removed for the current user through `Windows.Management.Deployment.PackageManager`, which needs no elevation and reports real progress. Only importing the signing certificate requests UAC, through an elevated, narrowly scoped PowerShell process, and that step is skipped when the certificate is already trusted. The launcher never changes Defender, SmartScreen, certificate validation, or system-wide security settings.
 
 ## Application structure
 
@@ -24,7 +24,11 @@ manifest → validate → disk/prerequisite checks → download all artifacts
          → remove current package → install target APPX → verify → restore data
 ```
 
-Download artifacts are written to `%LocalAppData%\EraseLauncher\Cache\*.partial`. A file is renamed into its final cache path only after its SHA-256 matches the remote manifest. The download service retries a source three times, then falls back to the next HTTPS mirror.
+Download artifacts are written to `%LocalAppData%\EraseLauncher\Cache\*.partial`. A file is renamed into its final cache path only after its SHA-256 matches the remote manifest. The download service retries a source three times, then falls back to the next HTTPS mirror. Interrupted downloads resume with an HTTP Range request; a partial file that fails verification is deleted and never resumed. Progress uses the manifest size, so it is accurate even when the server omits Content-Length.
+
+## Progress
+
+`InstallationProgressPlan` gives each state that will actually run a weight. Downloads share their budget by byte count (download plus SHA-256 verification), APPX removal and deployment use the percentage reported by Windows, and backup/restore report copied bytes. The overall percentage never decreases and only reads 100% when the installation has completed.
 
 The launcher never removes a Minecraft package before its replacement and every required artifact have downloaded and passed verification. It refuses to switch versions while `Minecraft.Windows` is running.
 

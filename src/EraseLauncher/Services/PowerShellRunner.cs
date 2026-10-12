@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
 
@@ -5,65 +6,66 @@ namespace EraseLauncher.Services;
 
 public sealed class PowerShellRunner(LoggingService log)
 {
-    public async Task<string> RunAsync(string script, CancellationToken cancellationToken)
-    {
-        var startInfo = CreateStartInfo(script, elevated: false);
-        using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Could not start PowerShell.");
-        var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
+    private const int ErrorCancelled = 1223;
 
-        var output = await outputTask;
-        var error = await errorTask;
-        if (process.ExitCode != 0)
-        {
-            var rawError = string.IsNullOrWhiteSpace(error) ? output : error;
-            await log.InfoAsync($"PowerShell operation failed: {rawError}", CancellationToken.None);
-            throw new InvalidOperationException(ToUserMessage(rawError));
-        }
-
-        return output.Trim();
-    }
-
+    /// <summary>
+    /// Runs a script elevated. Elevated processes cannot redirect output, so the script
+    /// writes its error to a temporary file that is read back for the log.
+    /// </summary>
     public async Task RunElevatedAsync(string script, CancellationToken cancellationToken)
     {
-        var startInfo = CreateStartInfo(script, elevated: true);
-        using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Administrator approval was cancelled.");
-        await process.WaitForExitAsync(cancellationToken);
-        if (process.ExitCode != 0)
+        var errorPath = Path.Combine(Path.GetTempPath(), $"erase-elevated-{Guid.NewGuid():N}.txt");
+        var wrapped = $"try {{ {script} }} catch {{ $_ | Out-String | Set-Content -LiteralPath {Quote(errorPath)} -Encoding UTF8; exit 1 }}";
+
+        Process? process;
+        try
         {
-            throw new InvalidOperationException("A Windows package operation failed. See the launcher log for details.");
+            process = Process.Start(CreateStartInfo(wrapped));
+        }
+        catch (Win32Exception exception) when (exception.NativeErrorCode == ErrorCancelled)
+        {
+            throw new InvalidOperationException("Administrator approval was declined. The certificate is required to install Minecraft.");
         }
 
-        await log.InfoAsync("Completed elevated Windows package operation.", cancellationToken);
+        using (process ?? throw new InvalidOperationException("Could not start the Windows certificate operation."))
+        {
+            await process.WaitForExitAsync(cancellationToken);
+            if (process.ExitCode != 0)
+            {
+                var details = File.Exists(errorPath) ? await File.ReadAllTextAsync(errorPath, CancellationToken.None) : "No details were reported.";
+                await log.InfoAsync($"Elevated operation failed: {details}", CancellationToken.None);
+                TryDelete(errorPath);
+                throw new InvalidOperationException("Windows could not trust the package certificate. See the launcher log for details.");
+            }
+        }
+
+        TryDelete(errorPath);
+        await log.InfoAsync("Completed elevated Windows operation.", cancellationToken);
     }
 
     public static string Quote(string value) => "'" + value.Replace("'", "''", StringComparison.Ordinal) + "'";
 
-    private static ProcessStartInfo CreateStartInfo(string script, bool elevated)
+    private static ProcessStartInfo CreateStartInfo(string script)
     {
         var preamble = "$ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'; $InformationPreference='SilentlyContinue'; ";
         var encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(preamble + script));
         return new ProcessStartInfo("powershell.exe")
         {
-            UseShellExecute = elevated,
-            Verb = elevated ? "runas" : string.Empty,
-            WindowStyle = elevated ? ProcessWindowStyle.Hidden : ProcessWindowStyle.Hidden,
-            RedirectStandardOutput = !elevated,
-            RedirectStandardError = !elevated,
-            CreateNoWindow = !elevated,
+            UseShellExecute = true,
+            Verb = "runas",
+            WindowStyle = ProcessWindowStyle.Hidden,
             Arguments = $"-NoProfile -NonInteractive -OutputFormat Text -ExecutionPolicy Bypass -EncodedCommand {encoded}"
         };
     }
 
-    private static string ToUserMessage(string rawError)
+    private static void TryDelete(string path)
     {
-        if (rawError.Contains("CLIXML", StringComparison.OrdinalIgnoreCase) ||
-            rawError.Contains("System.Management.Automation", StringComparison.OrdinalIgnoreCase))
+        try
         {
-            return "Windows package check failed. Restart Erase Launcher and try again.";
+            File.Delete(path);
         }
-
-        return string.IsNullOrWhiteSpace(rawError) ? "A Windows package operation failed." : rawError.Trim();
+        catch (IOException)
+        {
+        }
     }
 }
