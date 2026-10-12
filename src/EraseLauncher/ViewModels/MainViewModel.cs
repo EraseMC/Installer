@@ -6,24 +6,49 @@ using EraseLauncher.Services;
 
 namespace EraseLauncher.ViewModels;
 
+public enum ManifestState
+{
+    Loading,
+    Online,
+    Offline
+}
+
+public enum InstallOutcome
+{
+    None,
+    Running,
+    Succeeded,
+    Failed,
+    Cancelled
+}
+
 public sealed class MainViewModel : ObservableObject
 {
+    public const string DiscordUrl = "https://dsc.gg/erasemc";
+    private static readonly TimeSpan ManifestTimeout = TimeSpan.FromSeconds(20);
+
     private readonly ManifestService _manifestService;
     private readonly MinecraftService _minecraftService;
     private readonly SettingsService _settingsService;
     private readonly InstallationService _installationService;
     private readonly LoggingService _log;
     private CancellationTokenSource? _installationCancellation;
+    private MinecraftInstallation? _installation;
     private LauncherPage _currentPage = LauncherPage.Home;
-    private SettingsSection _settingsSection = SettingsSection.General;
-    private string _manifestStatus = "Checking Erase CDN…";
-    private string _installedVersion = "Minecraft not detected";
-    private string _installationMessage = "Waiting to start.";
+    private ManifestState _manifestState = ManifestState.Loading;
+    private string _manifestStatus = "Connecting to Erase CDN";
     private InstallationState _installationState = InstallationState.Idle;
+    private InstallOutcome _installOutcome;
+    private string _installationTitle = string.Empty;
+    private string _installationDetail = string.Empty;
     private double _installationPercentage;
+    private bool _canCancelInstallation;
     private bool _isBusy;
     private bool _isConfirmationOpen;
+    private bool _isCloseWarningOpen;
     private bool _preserveData = true;
+    private string _cacheSizeText = "Calculating";
+    private string _storageMessage = string.Empty;
     private VersionCardViewModel? _selectedVersion;
     private LauncherSettings _settings = new();
 
@@ -40,40 +65,64 @@ public sealed class MainViewModel : ObservableObject
         _installationService = installationService;
         _log = log;
 
-        NavigateCommand = new RelayCommand<LauncherPage>(page => CurrentPage = page);
-        NavigateSettingsCommand = new RelayCommand<SettingsSection>(section => SettingsSection = section);
+        NavigateCommand = new RelayCommand<LauncherPage>(Navigate);
         OpenInstallCommand = new RelayCommand<VersionCardViewModel>(OpenInstallConfirmation, version => version is not null && !IsBusy);
         ConfirmInstallCommand = new RelayCommand(() => _ = InstallAsync(), () => SelectedVersion is not null && !IsBusy);
         CancelConfirmationCommand = new RelayCommand(() => IsConfirmationOpen = false);
-        CancelInstallationCommand = new RelayCommand(() => _installationCancellation?.Cancel(), () => IsBusy);
-        RefreshCommand = new RelayCommand(() => _ = RefreshManifestAsync(), () => !IsBusy);
+        CancelInstallationCommand = new RelayCommand(() => _installationCancellation?.Cancel(), () => IsBusy && CanCancelInstallation);
+        RetryInstallCommand = new RelayCommand(() => _ = InstallAsync(), () => SelectedVersion is not null && !IsBusy);
+        FinishInstallCommand = new RelayCommand(FinishInstallSession, () => !IsBusy);
+        RefreshCommand = new RelayCommand(() => _ = RefreshAsync(), () => !IsBusy && ManifestState != ManifestState.Loading);
         PlayCommand = new RelayCommand(Play, () => HasInstalledMinecraft && !IsBusy);
-        OpenDiscordCommand = new RelayCommand(OpenDiscord);
+        OpenDiscordCommand = new RelayCommand(() => OpenUrl(DiscordUrl));
         OpenLauncherFolderCommand = new RelayCommand(() => OpenFolder(AppPaths.Root));
         OpenLogsFolderCommand = new RelayCommand(() => OpenFolder(AppPaths.Logs));
-        ClearCacheCommand = new RelayCommand(ClearCache, () => !IsBusy);
-        SaveSettingsCommand = new RelayCommand(() => _ = SaveSettingsAsync(), () => !IsBusy);
+        OpenBackupsFolderCommand = new RelayCommand(() => OpenFolder(AppPaths.Backups));
+        ClearCacheCommand = new RelayCommand(() => _ = ClearCacheAsync(), () => !IsBusy);
+        DismissCloseWarningCommand = new RelayCommand(() => IsCloseWarningOpen = false);
+        CloseDialogsCommand = new RelayCommand(() =>
+        {
+            IsConfirmationOpen = false;
+            IsCloseWarningOpen = false;
+        });
     }
 
     public ObservableCollection<VersionCardViewModel> Versions { get; } = [];
+
+    public ObservableCollection<InstallStepViewModel> Steps { get; } =
+    [
+        new("Check"),
+        new("Download"),
+        new("Prepare"),
+        new("Install"),
+        new("Finish")
+    ];
+
     public ICommand NavigateCommand { get; }
-    public ICommand NavigateSettingsCommand { get; }
     public ICommand OpenInstallCommand { get; }
     public ICommand ConfirmInstallCommand { get; }
     public ICommand CancelConfirmationCommand { get; }
     public ICommand CancelInstallationCommand { get; }
+    public ICommand RetryInstallCommand { get; }
+    public ICommand FinishInstallCommand { get; }
     public ICommand RefreshCommand { get; }
     public ICommand PlayCommand { get; }
     public ICommand OpenDiscordCommand { get; }
     public ICommand OpenLauncherFolderCommand { get; }
     public ICommand OpenLogsFolderCommand { get; }
+    public ICommand OpenBackupsFolderCommand { get; }
     public ICommand ClearCacheCommand { get; }
-    public ICommand SaveSettingsCommand { get; }
+    public ICommand DismissCloseWarningCommand { get; }
+    public ICommand CloseDialogsCommand { get; }
+
+    public string LauncherVersion { get; } = typeof(MainViewModel).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
+
+    // Navigation
 
     public LauncherPage CurrentPage
     {
         get => _currentPage;
-        set
+        private set
         {
             if (!SetProperty(ref _currentPage, value))
             {
@@ -87,160 +136,465 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
-    public bool IsHome => CurrentPage == LauncherPage.Home;
-    public bool IsVersions => CurrentPage == LauncherPage.Versions;
-    public bool IsSettings => CurrentPage == LauncherPage.Settings;
-    public bool IsInstallation => CurrentPage == LauncherPage.Installation;
-    public SettingsSection SettingsSection
+    // Two-way so keyboard and accessibility selection of a tab navigate too, not only clicks.
+    public bool IsHome { get => CurrentPage == LauncherPage.Home; set => NavigateIf(value, LauncherPage.Home); }
+    public bool IsVersions { get => CurrentPage == LauncherPage.Versions; set => NavigateIf(value, LauncherPage.Versions); }
+    public bool IsSettings { get => CurrentPage == LauncherPage.Settings; set => NavigateIf(value, LauncherPage.Settings); }
+    public bool IsInstallation { get => CurrentPage == LauncherPage.Installation; set => NavigateIf(value, LauncherPage.Installation); }
+
+    // Manifest
+
+    public ManifestState ManifestState
     {
-        get => _settingsSection;
+        get => _manifestState;
         private set
         {
-            if (!SetProperty(ref _settingsSection, value))
+            if (SetProperty(ref _manifestState, value))
             {
-                return;
+                OnPropertyChanged(nameof(IsManifestLoading));
+                OnPropertyChanged(nameof(IsManifestOnline));
+                OnPropertyChanged(nameof(IsManifestOffline));
+                CommandManager.InvalidateRequerySuggested();
             }
-
-            OnPropertyChanged(nameof(IsGeneralSettings));
-            OnPropertyChanged(nameof(IsDownloadsSettings));
-            OnPropertyChanged(nameof(IsAboutSettings));
         }
     }
 
-    public bool IsGeneralSettings => SettingsSection == global::EraseLauncher.ViewModels.SettingsSection.General;
-    public bool IsDownloadsSettings => SettingsSection == global::EraseLauncher.ViewModels.SettingsSection.Downloads;
-    public bool IsAboutSettings => SettingsSection == global::EraseLauncher.ViewModels.SettingsSection.About;
+    public bool IsManifestLoading => ManifestState == ManifestState.Loading;
+    public bool IsManifestOnline => ManifestState == ManifestState.Online;
+    public bool IsManifestOffline => ManifestState == ManifestState.Offline;
     public string ManifestStatus { get => _manifestStatus; private set => SetProperty(ref _manifestStatus, value); }
-    public string InstalledVersion { get => _installedVersion; private set => SetProperty(ref _installedVersion, value); }
-    public bool HasInstalledMinecraft { get; private set; }
-    public string InstallationMessage { get => _installationMessage; private set => SetProperty(ref _installationMessage, value); }
+
+    // Installed Minecraft
+
+    public bool HasInstalledMinecraft => _installation is not null;
+
+    public string InstalledVersionText => _installation is null
+        ? "Not installed"
+        : Versions.FirstOrDefault(card => card.IsInstalled)?.Id ?? _installation.Version.ToString();
+
+    public string InstalledDetail => _installation is null
+        ? "Pick a version to install Minecraft Bedrock."
+        : Versions.Any(card => card.IsInstalled)
+            ? "Minecraft Bedrock is installed and ready to play."
+            : "This Minecraft build is not one of the Erase versions.";
+
+    // Installation
+
+    public bool IsBusy
+    {
+        get => _isBusy;
+        private set
+        {
+            if (SetProperty(ref _isBusy, value))
+            {
+                CommandManager.InvalidateRequerySuggested();
+            }
+        }
+    }
+
     public InstallationState InstallationState { get => _installationState; private set => SetProperty(ref _installationState, value); }
-    public double InstallationPercentage { get => _installationPercentage; private set => SetProperty(ref _installationPercentage, value); }
-    public bool IsBusy { get => _isBusy; private set => SetProperty(ref _isBusy, value); }
-    public bool IsConfirmationOpen { get => _isConfirmationOpen; set => SetProperty(ref _isConfirmationOpen, value); }
+    public string InstallationTitle { get => _installationTitle; private set => SetProperty(ref _installationTitle, value); }
+    public string InstallationDetail { get => _installationDetail; private set => SetProperty(ref _installationDetail, value); }
+
+    public double InstallationPercentage
+    {
+        get => _installationPercentage;
+        private set
+        {
+            if (SetProperty(ref _installationPercentage, value))
+            {
+                OnPropertyChanged(nameof(InstallationFraction));
+                OnPropertyChanged(nameof(InstallationPercentText));
+                OnPropertyChanged(nameof(InstallTabText));
+            }
+        }
+    }
+
+    public double InstallationFraction => InstallationPercentage / 100;
+
+    // Floor, so the readout only says 100% when the installation has really finished.
+    public string InstallationPercentText => $"{Math.Floor(InstallationPercentage):0}%";
+
+    public bool CanCancelInstallation
+    {
+        get => _canCancelInstallation;
+        private set
+        {
+            if (SetProperty(ref _canCancelInstallation, value))
+            {
+                CommandManager.InvalidateRequerySuggested();
+            }
+        }
+    }
+
+    public InstallOutcome InstallOutcome
+    {
+        get => _installOutcome;
+        private set
+        {
+            if (SetProperty(ref _installOutcome, value))
+            {
+                OnPropertyChanged(nameof(HasInstallSession));
+                OnPropertyChanged(nameof(IsInstallRunning));
+                OnPropertyChanged(nameof(IsInstallSucceeded));
+                OnPropertyChanged(nameof(IsInstallFailed));
+                OnPropertyChanged(nameof(IsInstallCancelled));
+                OnPropertyChanged(nameof(IsInstallStopped));
+                OnPropertyChanged(nameof(InstallTabText));
+            }
+        }
+    }
+
+    public bool HasInstallSession => InstallOutcome != InstallOutcome.None;
+    public bool IsInstallRunning => InstallOutcome == InstallOutcome.Running;
+    public bool IsInstallSucceeded => InstallOutcome == InstallOutcome.Succeeded;
+    public bool IsInstallFailed => InstallOutcome == InstallOutcome.Failed;
+    public bool IsInstallCancelled => InstallOutcome == InstallOutcome.Cancelled;
+    public bool IsInstallStopped => InstallOutcome is InstallOutcome.Failed or InstallOutcome.Cancelled;
+
+    public string InstallTabText => InstallOutcome switch
+    {
+        InstallOutcome.Running => $"Installing {InstallationPercentText}",
+        InstallOutcome.Succeeded => "Installed",
+        InstallOutcome.Failed => "Install failed",
+        InstallOutcome.Cancelled => "Cancelled",
+        _ => "Install"
+    };
+
+    public VersionCardViewModel? SelectedVersion
+    {
+        get => _selectedVersion;
+        private set
+        {
+            if (SetProperty(ref _selectedVersion, value))
+            {
+                OnPropertyChanged(nameof(ReplaceNotice));
+            }
+        }
+    }
+
+    public string ReplaceNotice => _installation is null
+        ? "Minecraft is not installed yet, nothing will be replaced."
+        : $"Replaces the installed version ({InstalledVersionText}).";
+
+    // Dialogs
+
+    public bool IsConfirmationOpen
+    {
+        get => _isConfirmationOpen;
+        private set
+        {
+            if (SetProperty(ref _isConfirmationOpen, value))
+            {
+                OnPropertyChanged(nameof(IsDialogOpen));
+            }
+        }
+    }
+
+    public bool IsCloseWarningOpen
+    {
+        get => _isCloseWarningOpen;
+        private set
+        {
+            if (SetProperty(ref _isCloseWarningOpen, value))
+            {
+                OnPropertyChanged(nameof(IsDialogOpen));
+            }
+        }
+    }
+
+    public bool IsDialogOpen => IsConfirmationOpen || IsCloseWarningOpen;
     public bool PreserveData { get => _preserveData; set => SetProperty(ref _preserveData, value); }
-    public VersionCardViewModel? SelectedVersion { get => _selectedVersion; private set => SetProperty(ref _selectedVersion, value); }
-    public LauncherSettings Settings { get => _settings; private set => SetProperty(ref _settings, value); }
-    public string LauncherVersion => "0.1.0";
+
+    // Settings
+
+    public bool LaunchAfterInstall
+    {
+        get => _settings.LaunchAfterInstall;
+        set => UpdateSetting(() => _settings.LaunchAfterInstall = value);
+    }
+
+    public bool OpenDiscordAfterFirstInstall
+    {
+        get => _settings.OpenDiscordAfterFirstInstall;
+        set => UpdateSetting(() => _settings.OpenDiscordAfterFirstInstall = value);
+    }
+
+    public bool PreserveDataByDefault
+    {
+        get => _settings.PreserveDataByDefault;
+        set => UpdateSetting(() => _settings.PreserveDataByDefault = value);
+    }
+
+    public string CacheSizeText { get => _cacheSizeText; private set => SetProperty(ref _cacheSizeText, value); }
+    public string StorageMessage { get => _storageMessage; private set => SetProperty(ref _storageMessage, value); }
 
     public async Task InitializeAsync()
     {
-        try
-        {
-            Settings = await _settingsService.LoadAsync(CancellationToken.None);
-            await RefreshMinecraftAsync();
-            await RefreshManifestAsync();
-        }
-        catch (Exception exception)
-        {
-            await _log.InfoAsync($"Startup check failed: {exception}");
-        }
+        _settings = await _settingsService.LoadAsync(CancellationToken.None);
+        OnPropertyChanged(nameof(LaunchAfterInstall));
+        OnPropertyChanged(nameof(OpenDiscordAfterFirstInstall));
+        OnPropertyChanged(nameof(PreserveDataByDefault));
+        await RefreshAsync();
     }
 
-    public async Task RefreshManifestAsync()
+    /// <summary>Returns false and explains why when closing would interrupt an installation.</summary>
+    public bool TryRequestClose()
     {
+        if (!IsBusy)
+        {
+            return true;
+        }
+
+        IsConfirmationOpen = false;
+        IsCloseWarningOpen = true;
+        return false;
+    }
+
+    private async Task RefreshAsync()
+    {
+        await RefreshMinecraftAsync();
+        await RefreshManifestAsync();
+    }
+
+    private async Task RefreshManifestAsync()
+    {
+        ManifestState = ManifestState.Loading;
+        ManifestStatus = "Connecting to Erase CDN";
         try
         {
-            ManifestStatus = "Updating available versions…";
-            var manifest = await _manifestService.GetAsync(CancellationToken.None);
+            using var timeout = new CancellationTokenSource(ManifestTimeout);
+            var manifest = await _manifestService.GetAsync(timeout.Token);
             Versions.Clear();
             foreach (var version in manifest.Versions.OrderByDescending(item => Version.Parse(item.Id)))
             {
                 Versions.Add(new VersionCardViewModel(version));
             }
 
-            ManifestStatus = $"Online · {Versions.Count} version(s) available";
+            ManifestState = ManifestState.Online;
+            ManifestStatus = Versions.Count == 1 ? "Online, 1 version available" : $"Online, {Versions.Count} versions available";
         }
         catch (Exception exception)
         {
             Versions.Clear();
-            ManifestStatus = "CDN unavailable — try again later";
+            ManifestState = ManifestState.Offline;
+            ManifestStatus = "Erase CDN is unreachable";
             await _log.InfoAsync($"Manifest check failed: {exception}");
         }
+
+        UpdateInstalledFlags();
     }
 
     private async Task RefreshMinecraftAsync()
     {
         try
         {
-            var installation = await _minecraftService.GetInstallationAsync(CancellationToken.None);
-            HasInstalledMinecraft = installation is not null;
-            InstalledVersion = installation is null ? "Minecraft not detected" : $"Minecraft Bedrock {installation.Version}";
-            OnPropertyChanged(nameof(HasInstalledMinecraft));
-            ((RelayCommand)PlayCommand).RaiseCanExecuteChanged();
+            _installation = await _minecraftService.GetInstallationAsync(CancellationToken.None);
         }
         catch (Exception exception)
         {
-            HasInstalledMinecraft = false;
-            InstalledVersion = "Could not check Minecraft";
-            OnPropertyChanged(nameof(HasInstalledMinecraft));
+            _installation = null;
             await _log.InfoAsync($"Minecraft detection failed: {exception}");
+        }
+
+        UpdateInstalledFlags();
+    }
+
+    private void UpdateInstalledFlags()
+    {
+        foreach (var card in Versions)
+        {
+            card.IsInstalled = _installation is not null && VersionService.MatchesMinecraftBuild(_installation.Version, card.Id);
+        }
+
+        OnPropertyChanged(nameof(HasInstalledMinecraft));
+        OnPropertyChanged(nameof(InstalledVersionText));
+        OnPropertyChanged(nameof(InstalledDetail));
+        OnPropertyChanged(nameof(ReplaceNotice));
+        CommandManager.InvalidateRequerySuggested();
+    }
+
+    private void NavigateIf(bool selected, LauncherPage page)
+    {
+        if (selected)
+        {
+            Navigate(page);
+        }
+    }
+
+    private void Navigate(LauncherPage page)
+    {
+        CurrentPage = page;
+        if (page == LauncherPage.Settings)
+        {
+            _ = RefreshCacheSizeAsync();
         }
     }
 
     private void OpenInstallConfirmation(VersionCardViewModel? version)
     {
-        if (version is null)
+        if (version is null || IsBusy)
         {
             return;
         }
 
         SelectedVersion = version;
-        PreserveData = true;
+        PreserveData = _settings.PreserveDataByDefault;
         IsConfirmationOpen = true;
-        ((RelayCommand)ConfirmInstallCommand).RaiseCanExecuteChanged();
     }
 
     private async Task InstallAsync()
     {
-        if (SelectedVersion is null)
+        if (SelectedVersion is not { } selected || IsBusy)
         {
             return;
         }
 
         IsConfirmationOpen = false;
         IsBusy = true;
+        InstallOutcome = InstallOutcome.Running;
         CurrentPage = LauncherPage.Installation;
         InstallationPercentage = 0;
-        _installationCancellation = new CancellationTokenSource();
-        RaiseCommandStates();
+        InstallationTitle = "Preparing installation";
+        InstallationDetail = string.Empty;
+        CanCancelInstallation = true;
+        foreach (var step in Steps)
+        {
+            step.Status = StepStatus.Pending;
+        }
 
+        _installationCancellation = new CancellationTokenSource();
         try
         {
             var progress = new Progress<InstallationProgress>(UpdateInstallationProgress);
-            var request = new InstallationRequest(SelectedVersion.Version, PreserveData, Settings.LaunchAfterInstall);
-            await _installationService.InstallAsync(request, progress, _installationCancellation.Token);
+            var request = new InstallationRequest(selected.Version, PreserveData, _settings.LaunchAfterInstall);
+            await Task.Run(() => _installationService.InstallAsync(request, progress, _installationCancellation.Token));
+            InstallOutcome = InstallOutcome.Succeeded;
             await RefreshMinecraftAsync();
-            if (Settings.LaunchAfterInstall && HasInstalledMinecraft)
-            {
-                Play();
-            }
+            await OnInstallSucceededAsync(selected);
         }
         catch (OperationCanceledException)
         {
-            // The service already provides the user-facing cancellation state.
+            InstallOutcome = InstallOutcome.Cancelled;
+            InstallationTitle = "Installation cancelled";
+            InstallationDetail = "Downloaded files are kept, so the next attempt continues where this one stopped.";
+            await RefreshMinecraftAsync();
         }
         catch (Exception exception)
         {
-            InstallationMessage = exception.Message;
+            InstallOutcome = InstallOutcome.Failed;
+            InstallationTitle = "Installation failed";
+            InstallationDetail = exception.Message;
+            await RefreshMinecraftAsync();
         }
         finally
         {
             _installationCancellation.Dispose();
             _installationCancellation = null;
+            CanCancelInstallation = false;
             IsBusy = false;
-            RaiseCommandStates();
+        }
+    }
+
+    private async Task OnInstallSucceededAsync(VersionCardViewModel installed)
+    {
+        var firstInstall = !_settings.HasCompletedInstall;
+        _settings.HasCompletedInstall = true;
+        _settings.SelectedVersionId = installed.Id;
+        await SaveSettingsAsync();
+
+        if (firstInstall && _settings.OpenDiscordAfterFirstInstall)
+        {
+            OpenUrl(DiscordUrl);
+        }
+
+        if (_settings.LaunchAfterInstall && HasInstalledMinecraft)
+        {
+            Play();
         }
     }
 
     private void UpdateInstallationProgress(InstallationProgress progress)
     {
-        InstallationState = progress.State;
-        InstallationMessage = progress.Message;
-        if (progress.Percentage is not null)
+        // Results reported after the run has ended belong to the finished session.
+        if (InstallOutcome != InstallOutcome.Running)
         {
-            InstallationPercentage = progress.Percentage.Value;
+            return;
         }
+
+        InstallationState = progress.State;
+        CanCancelInstallation = progress.CanCancel;
+        if (progress.Percentage is { } percentage)
+        {
+            InstallationPercentage = percentage;
+        }
+
+        if (progress.State is InstallationState.Failed or InstallationState.Cancelled)
+        {
+            foreach (var step in Steps.Where(step => step.IsActive))
+            {
+                step.Status = StepStatus.Failed;
+            }
+
+            return;
+        }
+
+        InstallationTitle = progress.Message;
+        InstallationDetail = DescribeDetail(progress);
+        var activeIndex = StepIndex(progress.State);
+        for (var index = 0; index < Steps.Count; index++)
+        {
+            Steps[index].Status = index < activeIndex ? StepStatus.Done : index == activeIndex ? StepStatus.Active : StepStatus.Pending;
+        }
+    }
+
+    private static string DescribeDetail(InstallationProgress progress)
+    {
+        if (progress.Download is { TotalBytes: { } total } download)
+        {
+            if (download.Stage == TransferStage.Verifying)
+            {
+                return $"Verifying SHA-256  ·  {Format.Bytes(download.BytesReceived)} of {Format.Bytes(total)}";
+            }
+
+            var text = $"{Format.Bytes(download.BytesReceived)} of {Format.Bytes(total)}";
+            if (download.BytesPerSecond > 0)
+            {
+                text += $"  ·  {Format.Bytes(download.BytesPerSecond)}/s";
+            }
+
+            if (download.Remaining is { } remaining)
+            {
+                text += $"  ·  {Format.Duration(remaining)} left";
+            }
+
+            return text;
+        }
+
+        return progress.State switch
+        {
+            InstallationState.InstallingCertificate => "Approve the Windows prompt if it appears.",
+            InstallationState.RemovingExistingVersion or InstallationState.InstallingMinecraft => "Windows is replacing the package. Keep the launcher open.",
+            InstallationState.BackingUp or InstallationState.RestoringData => "Worlds, packs and settings from com.mojang.",
+            InstallationState.Completed => "Every file was verified before it was installed.",
+            _ => string.Empty
+        };
+    }
+
+    private static int StepIndex(InstallationState state) => state switch
+    {
+        InstallationState.Idle or InstallationState.Preparing or InstallationState.CheckingPrerequisites => 0,
+        InstallationState.DownloadingDependencies or InstallationState.DownloadingPackage or InstallationState.Verifying => 1,
+        InstallationState.BackingUp or InstallationState.InstallingCertificate or InstallationState.InstallingDependencies => 2,
+        InstallationState.RemovingExistingVersion or InstallationState.InstallingMinecraft or InstallationState.VerifyingInstallation => 3,
+        InstallationState.RestoringData or InstallationState.Finalizing => 4,
+        _ => 5
+    };
+
+    private void FinishInstallSession()
+    {
+        InstallOutcome = InstallOutcome.None;
+        CurrentPage = LauncherPage.Home;
     }
 
     private void Play()
@@ -251,41 +605,86 @@ public sealed class MainViewModel : ObservableObject
         }
         catch (Exception exception)
         {
-            InstallationMessage = $"Could not launch Minecraft: {exception.Message}";
-            CurrentPage = LauncherPage.Installation;
+            _ = _log.InfoAsync($"Launch failed: {exception}");
         }
     }
 
-    private static void OpenDiscord() => Process.Start(new ProcessStartInfo("https://dsc.gg/erasemc") { UseShellExecute = true });
-
-    private static void OpenFolder(string path)
+    private void UpdateSetting(Action apply, [System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null)
     {
-        Directory.CreateDirectory(path);
-        Process.Start(new ProcessStartInfo("explorer.exe", path) { UseShellExecute = true });
-    }
-
-    private void ClearCache()
-    {
-        if (Directory.Exists(AppPaths.Cache))
-        {
-            Directory.Delete(AppPaths.Cache, true);
-        }
+        apply();
+        OnPropertyChanged(propertyName);
+        _ = SaveSettingsAsync();
     }
 
     private async Task SaveSettingsAsync()
     {
-        await _settingsService.SaveAsync(Settings, CancellationToken.None);
-        InstallationMessage = "Settings saved.";
+        try
+        {
+            await _settingsService.SaveAsync(_settings, CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            await _log.InfoAsync($"Saving settings failed: {exception}");
+        }
     }
 
-    private void RaiseCommandStates()
+    private async Task RefreshCacheSizeAsync()
     {
-        ((RelayCommand<VersionCardViewModel>)OpenInstallCommand).RaiseCanExecuteChanged();
-        ((RelayCommand)ConfirmInstallCommand).RaiseCanExecuteChanged();
-        ((RelayCommand)CancelInstallationCommand).RaiseCanExecuteChanged();
-        ((RelayCommand)RefreshCommand).RaiseCanExecuteChanged();
-        ((RelayCommand)PlayCommand).RaiseCanExecuteChanged();
-        ((RelayCommand)ClearCacheCommand).RaiseCanExecuteChanged();
-        ((RelayCommand)SaveSettingsCommand).RaiseCanExecuteChanged();
+        var size = await Task.Run(() => DirectorySize(AppPaths.Cache));
+        CacheSizeText = size == 0 ? "Empty" : Format.Bytes(size);
+    }
+
+    private async Task ClearCacheAsync()
+    {
+        try
+        {
+            var freed = await Task.Run(() =>
+            {
+                var size = DirectorySize(AppPaths.Cache);
+                if (Directory.Exists(AppPaths.Cache))
+                {
+                    Directory.Delete(AppPaths.Cache, true);
+                }
+
+                return size;
+            });
+            StorageMessage = freed == 0 ? "The cache was already empty." : $"Freed {Format.Bytes(freed)}.";
+        }
+        catch (Exception exception)
+        {
+            StorageMessage = "Some cached files are in use and were not removed.";
+            await _log.InfoAsync($"Clearing the cache failed: {exception}");
+        }
+
+        await RefreshCacheSizeAsync();
+    }
+
+    private static long DirectorySize(string path) => Directory.Exists(path)
+        ? new DirectoryInfo(path).EnumerateFiles("*", SearchOption.AllDirectories).Sum(file => file.Length)
+        : 0;
+
+    private void OpenUrl(string url)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch (Exception exception)
+        {
+            _ = _log.InfoAsync($"Opening {url} failed: {exception}");
+        }
+    }
+
+    private void OpenFolder(string path)
+    {
+        try
+        {
+            Directory.CreateDirectory(path);
+            Process.Start(new ProcessStartInfo("explorer.exe", $"\"{path}\"") { UseShellExecute = true });
+        }
+        catch (Exception exception)
+        {
+            _ = _log.InfoAsync($"Opening {path} failed: {exception}");
+        }
     }
 }

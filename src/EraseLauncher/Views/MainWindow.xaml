@@ -1,29 +1,819 @@
 <Window x:Class="EraseLauncher.Views.MainWindow"
- xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="clr-namespace:EraseLauncher.ViewModels"
- Title="Erase Launcher" Width="1100" Height="700" MinWidth="900" MinHeight="620" WindowStyle="None" AllowsTransparency="True" ResizeMode="CanResize" Background="#10140F" UseLayoutRounding="True" SnapsToDevicePixels="True">
- <Window.Resources>
-  <Style x:Key="TitleControl" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Setter Property="Width" Value="52"/><Setter Property="MinWidth" Value="0"/><Setter Property="Height" Value="46"/><Setter Property="Padding" Value="0"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderBrush" Value="Transparent"/><Setter Property="Foreground" Value="{StaticResource Brush.TextMuted}"/></Style>
-  <Style x:Key="CloseTitleControl" TargetType="Button" BasedOn="{StaticResource TitleControl}"><Style.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="#33F15B5B"/><Setter Property="Foreground" Value="#FFF2F0"/></Trigger></Style.Triggers></Style>
-  <Style x:Key="TopNav" TargetType="RadioButton"><Setter Property="Height" Value="38"/><Setter Property="Padding" Value="15,0"/><Setter Property="Foreground" Value="{StaticResource Brush.TextMuted}"/><Setter Property="FontFamily" Value="{StaticResource Font.Body}"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="FontSize" Value="11"/><Setter Property="Cursor" Value="Hand"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="RadioButton"><Border x:Name="Root" Background="Transparent" CornerRadius="12"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Root" Property="Background" Value="#1C2619"/><Setter Property="Foreground" Value="{StaticResource Brush.Text}"/></Trigger><Trigger Property="IsChecked" Value="True"><Setter TargetName="Root" Property="Background" Value="#24331E"/><Setter Property="Foreground" Value="{StaticResource Brush.Accent}"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
-  <Style x:Key="SettingsNav" TargetType="RadioButton"><Setter Property="Height" Value="54"/><Setter Property="Padding" Value="13,0"/><Setter Property="Foreground" Value="{StaticResource Brush.TextMuted}"/><Setter Property="FontFamily" Value="{StaticResource Font.Body}"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="FontSize" Value="14"/><Setter Property="Cursor" Value="Hand"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="RadioButton"><Border x:Name="Root" Background="Transparent" CornerRadius="14"><ContentPresenter VerticalAlignment="Center"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Root" Property="Background" Value="#1D271A"/><Setter Property="Foreground" Value="{StaticResource Brush.Text}"/></Trigger><Trigger Property="IsChecked" Value="True"><Setter TargetName="Root" Property="Background" Value="#B9FA57"/><Setter Property="Foreground" Value="{StaticResource Brush.AccentDark}"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
-  <Style x:Key="VersionCard" TargetType="Border" BasedOn="{StaticResource Card}"><Setter Property="Width" Value="326"/><Setter Property="Height" Value="250"/><Setter Property="Margin" Value="0,0,18,18"/><Setter Property="Padding" Value="22"/></Style>
- </Window.Resources>
- <Border Background="#10140F" BorderBrush="#283125" BorderThickness="1" ClipToBounds="True"><Grid><Grid.RowDefinitions><RowDefinition Height="68"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-  <Grid Grid.Row="0" Background="#121711" MouseLeftButtonDown="TitleBar_OnMouseLeftButtonDown"><Grid.ColumnDefinitions><ColumnDefinition Width="260"/><ColumnDefinition Width="*"/><ColumnDefinition Width="210"/></Grid.ColumnDefinitions>
-   <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="25,0"><Grid Width="34" Height="34" Margin="0,0,12,0"><Polygon Points="17,0 32,8 32,26 17,34 2,26 2,8" Fill="{StaticResource Brush.Accent}"/><Path Data="M12,10 H24 V14 H17 V16 H22 V20 H17 V24 H24 V28 H12 Z" Fill="{StaticResource Brush.AccentDark}"/></Grid><StackPanel VerticalAlignment="Center"><TextBlock Text="ERASE" Foreground="{StaticResource Brush.Text}" FontWeight="Bold" FontSize="17"/><TextBlock Text="LAUNCHER" Foreground="{StaticResource Brush.TextMuted}" FontWeight="SemiBold" FontSize="9"/></StackPanel></StackPanel>
-   <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center"><RadioButton Style="{StaticResource TopNav}" IsChecked="{Binding IsHome, Mode=OneWay}" Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:LauncherPage.Home}" GroupName="TopNavigation" Content="HOME"/><RadioButton Style="{StaticResource TopNav}" IsChecked="{Binding IsVersions, Mode=OneWay}" Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:LauncherPage.Versions}" GroupName="TopNavigation" Content="VERSIONS" Margin="8,0"/><RadioButton Style="{StaticResource TopNav}" IsChecked="{Binding IsSettings, Mode=OneWay}" Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:LauncherPage.Settings}" GroupName="TopNavigation" Content="SETTINGS"/></StackPanel>
-   <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,4,20,0"><Button Style="{StaticResource TitleControl}" Click="Minimize_OnClick" ToolTip="Minimize"><Path Data="M14,22 H30" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.8" StrokeStartLineCap="Round"/></Button><Button Style="{StaticResource TitleControl}" Click="Maximize_OnClick" ToolTip="Maximize or restore"><Path Data="M15,14 H28 V27 H15 Z M18,11 H31 V24" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.6" Fill="Transparent"/></Button><Button Style="{StaticResource CloseTitleControl}" Click="Close_OnClick" ToolTip="Close"><Path Data="M16,16 L28,28 M28,16 L16,28" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.8" StrokeStartLineCap="Round"/></Button></StackPanel>
-  </Grid>
-  <Grid Grid.Row="1">
-   <Grid Visibility="{Binding IsHome, Converter={StaticResource BooleanToVisibilityConverter}}" ClipToBounds="True"><Grid.Background><LinearGradientBrush StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#11170F" Offset="0"/><GradientStop Color="#0D110C" Offset=".5"/><GradientStop Color="#080A08" Offset="1"/></LinearGradientBrush></Grid.Background><Ellipse Width="680" Height="420" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-230,-160,0" Opacity=".2"><Ellipse.Fill><RadialGradientBrush><GradientStop Color="#98D747" Offset="0"/><GradientStop Color="#314C20" Offset=".45"/><GradientStop Color="#0D100C" Offset="1"/></RadialGradientBrush></Ellipse.Fill><Ellipse.Effect><BlurEffect Radius="64"/></Ellipse.Effect></Ellipse>
-    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="430" Margin="0,-12,0,0"><TextBlock Text="ERASE LEGACY" HorizontalAlignment="Center" Style="{StaticResource Type.Eyebrow}" Foreground="{StaticResource Brush.Accent}"/><TextBlock Text="Ready to play?" HorizontalAlignment="Center" Foreground="{StaticResource Brush.Text}" FontFamily="{StaticResource Font.Display}" FontSize="42" FontWeight="SemiBold" Margin="0,12,0,4"/><TextBlock Text="{Binding InstalledVersion}" HorizontalAlignment="Center" Style="{StaticResource Type.Body}" TextAlignment="Center"/><Button Style="{StaticResource Button.Primary}" Height="58" Margin="40,28,40,10" Command="{Binding PlayCommand}"><StackPanel Orientation="Horizontal" HorizontalAlignment="Center"><Path Data="M0,0 L0,16 L13,8 Z" Fill="{StaticResource Brush.AccentDark}" Width="13" Height="16" Stretch="Fill" Margin="0,0,11,0"/><TextBlock Text="LAUNCH MINECRAFT" FontWeight="Bold" VerticalAlignment="Center"/></StackPanel></Button><Button Style="{StaticResource Button.Secondary}" Height="52" Margin="40,0" Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:LauncherPage.Versions}" Content="MANAGE VERSIONS"/></StackPanel>
-    <Grid VerticalAlignment="Bottom" Margin="28,0,28,26"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border Background="#B9131812" BorderBrush="#33402E" BorderThickness="1" CornerRadius="14" Padding="15,12" Margin="0,0,8,0"><StackPanel><TextBlock Text="NETWORK" Style="{StaticResource Type.Eyebrow}"/><TextBlock Text="Erase Community" Foreground="{StaticResource Brush.Text}" FontWeight="SemiBold" Margin="0,5,0,0"/></StackPanel></Border><Border Grid.Column="1" Background="#B9131812" BorderBrush="#33402E" BorderThickness="1" CornerRadius="14" Padding="15,12" Margin="8,0"><StackPanel><TextBlock Text="CONNECTION" Style="{StaticResource Type.Eyebrow}"/><TextBlock Text="{Binding ManifestStatus}" Foreground="{StaticResource Brush.Text}" FontWeight="SemiBold" Margin="0,5,0,0" TextTrimming="CharacterEllipsis"/></StackPanel></Border><Button Grid.Column="2" Style="{StaticResource Button.Secondary}" Height="60" Margin="8,0,0,0" Command="{Binding OpenDiscordCommand}" Content="JOIN DISCORD"/></Grid>
-   </Grid>
-   <Grid Visibility="{Binding IsVersions, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="42,32,42,26"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="16"/><RowDefinition Height="Auto"/><RowDefinition Height="18"/><RowDefinition Height="*"/></Grid.RowDefinitions><Grid><StackPanel><TextBlock Text="Your versions" Style="{StaticResource Type.PageTitle}"/><TextBlock Text="Choose a verified legacy build for Erase." Style="{StaticResource Type.Body}" Margin="0,6,0,0"/></StackPanel><Button HorizontalAlignment="Right" VerticalAlignment="Center" Width="132" Height="50" Style="{StaticResource Button.Secondary}" Command="{Binding RefreshCommand}" Content="REFRESH"/></Grid><Border Grid.Row="2" Background="#172016" BorderBrush="#34402F" BorderThickness="1" CornerRadius="14" Padding="15,11"><StackPanel Orientation="Horizontal"><Ellipse Width="8" Height="8" Fill="{StaticResource Brush.Accent}" VerticalAlignment="Center" Margin="0,0,9,0"/><TextBlock Text="{Binding ManifestStatus}" Foreground="{StaticResource Brush.Text}" FontWeight="SemiBold" VerticalAlignment="Center"/></StackPanel></Border><ScrollViewer Grid.Row="4" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><ItemsControl ItemsSource="{Binding Versions}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><Border Style="{StaticResource VersionCard}"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions><StackPanel><TextBlock Text="{Binding Id}" Foreground="{StaticResource Brush.Text}" FontSize="24" FontWeight="SemiBold"/><TextBlock Text="MINECRAFT BEDROCK" Style="{StaticResource Type.Eyebrow}" Margin="0,5,0,0"/></StackPanel><StackPanel Grid.Row="1" VerticalAlignment="Center"><TextBlock Text="{Binding Subtitle}" Style="{StaticResource Type.Body}"/><Border HorizontalAlignment="Left" Background="#26331E" CornerRadius="9" Padding="9,5" Margin="0,14,0,0"><TextBlock Text="VERIFIED DOWNLOAD" Style="{StaticResource Type.Eyebrow}" Foreground="{StaticResource Brush.Accent}"/></Border></StackPanel><Button Grid.Row="2" Style="{StaticResource Button.Primary}" Height="54" Command="{Binding DataContext.OpenInstallCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" Content="INSTALL"/></Grid></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></ScrollViewer></Grid>
-   <Grid Visibility="{Binding IsSettings, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="22,20"><Grid.ColumnDefinitions><ColumnDefinition Width="232"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border Background="#151A14" BorderBrush="#30392C" BorderThickness="1" CornerRadius="20" Padding="14"><DockPanel><Button DockPanel.Dock="Bottom" Style="{StaticResource Button.Secondary}" Height="52" Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:LauncherPage.Home}" Content="RETURN HOME"/><StackPanel><StackPanel Orientation="Horizontal" Margin="7,5,0,24"><Grid Width="30" Height="30" Margin="0,0,11,0"><Polygon Points="15,0 29,8 29,23 15,31 1,23 1,8" Fill="{StaticResource Brush.Accent}"/><Path Data="M10,10 H22 V14 H15 V16 H20 V20 H15 V24 H22 V28 H10 Z" Fill="{StaticResource Brush.AccentDark}"/></Grid><TextBlock Text="Settings" FontSize="23" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{StaticResource Brush.Text}"/></StackPanel><RadioButton Style="{StaticResource SettingsNav}" IsChecked="{Binding IsGeneralSettings, Mode=OneWay}" Command="{Binding NavigateSettingsCommand}" CommandParameter="{x:Static vm:SettingsSection.General}" GroupName="SettingsNavigation"><StackPanel Orientation="Horizontal"><Path Data="M12,3 A9,9 0 1 0 12.1,3 M12,7 V8 M12,11 V17" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" StrokeThickness="1.9" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="24" Height="24" Stretch="Uniform" Margin="0,0,12,0"/><TextBlock Text="General" VerticalAlignment="Center"/></StackPanel></RadioButton><RadioButton Style="{StaticResource SettingsNav}" IsChecked="{Binding IsDownloadsSettings, Mode=OneWay}" Command="{Binding NavigateSettingsCommand}" CommandParameter="{x:Static vm:SettingsSection.Downloads}" GroupName="SettingsNavigation"><StackPanel Orientation="Horizontal"><Path Data="M12,3 V14 M7,10 L12,15 L17,10 M4,20 H20" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" StrokeThickness="1.9" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="24" Height="24" Stretch="Uniform" Margin="0,0,12,0"/><TextBlock Text="Downloads" VerticalAlignment="Center"/></StackPanel></RadioButton><RadioButton Style="{StaticResource SettingsNav}" IsChecked="{Binding IsAboutSettings, Mode=OneWay}" Command="{Binding NavigateSettingsCommand}" CommandParameter="{x:Static vm:SettingsSection.About}" GroupName="SettingsNavigation"><StackPanel Orientation="Horizontal"><Path Data="M12,3 A9,9 0 1 0 12.1,3 M12,11 V17 M12,7 V8" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" StrokeThickness="1.9" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="24" Height="24" Stretch="Uniform" Margin="0,0,12,0"/><TextBlock Text="About" VerticalAlignment="Center"/></StackPanel></RadioButton></StackPanel></DockPanel></Border>
-    <Border Grid.Column="2" Background="#171C16" BorderBrush="#30392C" BorderThickness="1" CornerRadius="20" Padding="30,24"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><Grid><StackPanel Visibility="{Binding IsGeneralSettings, Converter={StaticResource BooleanToVisibilityConverter}}"><TextBlock Text="General" Style="{StaticResource Type.PageTitle}" FontSize="30"/><TextBlock Text="Choose how Erase Launcher behaves on this computer." Style="{StaticResource Type.Body}" Margin="0,6,0,20"/><Border Background="#121611" BorderBrush="#2C3629" BorderThickness="1" CornerRadius="16" Padding="18" Margin="0,0,0,12"><StackPanel><TextBlock Text="LAUNCHER" Style="{StaticResource Type.Eyebrow}" Foreground="{StaticResource Brush.Accent}" Margin="0,0,0,8"/><CheckBox Style="{StaticResource Toggle}" Content="Launch Minecraft after installation" IsChecked="{Binding Settings.LaunchAfterInstall}"/><CheckBox Style="{StaticResource Toggle}" Content="Check for launcher updates" IsChecked="{Binding Settings.CheckForUpdates}"/></StackPanel></Border><Border Background="#121611" BorderBrush="#2C3629" BorderThickness="1" CornerRadius="16" Padding="18" Margin="0,0,0,16"><StackPanel><TextBlock Text="DATA &amp; COMMUNITY" Style="{StaticResource Type.Eyebrow}" Foreground="{StaticResource Brush.Accent}" Margin="0,0,0,8"/><CheckBox Style="{StaticResource Toggle}" Content="Remember selected version" IsChecked="{Binding Settings.RememberSelectedVersion}"/><CheckBox Style="{StaticResource Toggle}" Content="Open Discord after first install" IsChecked="{Binding Settings.OpenDiscordAfterFirstInstall}"/></StackPanel></Border><Button Style="{StaticResource Button.Primary}" HorizontalAlignment="Left" Width="178" Height="54" Command="{Binding SaveSettingsCommand}" Content="SAVE CHANGES"/></StackPanel><StackPanel Visibility="{Binding IsDownloadsSettings, Converter={StaticResource BooleanToVisibilityConverter}}"><TextBlock Text="Downloads" Style="{StaticResource Type.PageTitle}" FontSize="30"/><TextBlock Text="Manage verified installation files stored by Erase Launcher." Style="{StaticResource Type.Body}" Margin="0,6,0,20"/><Border Background="#121611" BorderBrush="#2C3629" BorderThickness="1" CornerRadius="16" Padding="18"><StackPanel><TextBlock Text="LOCAL CACHE" Style="{StaticResource Type.Eyebrow}" Foreground="{StaticResource Brush.Accent}"/><TextBlock Text="Clearing the cache never removes Minecraft worlds or installed packages." Style="{StaticResource Type.Body}" Margin="0,9,0,18"/><WrapPanel><Button Style="{StaticResource Button.Secondary}" Width="156" Height="52" Command="{Binding OpenLauncherFolderCommand}" Content="OPEN FOLDER" Margin="0,0,10,10"/><Button Style="{StaticResource Button.Secondary}" Width="140" Height="52" Command="{Binding OpenLogsFolderCommand}" Content="OPEN LOGS" Margin="0,0,10,10"/><Button Style="{StaticResource Button.Secondary}" Width="148" Height="52" Command="{Binding ClearCacheCommand}" Content="CLEAR CACHE" Margin="0,0,10,10"/></WrapPanel></StackPanel></Border></StackPanel><StackPanel Visibility="{Binding IsAboutSettings, Converter={StaticResource BooleanToVisibilityConverter}}"><TextBlock Text="About Erase" Style="{StaticResource Type.PageTitle}" FontSize="30"/><TextBlock Text="A focused launcher for verified legacy Minecraft Bedrock builds used by Erase." Style="{StaticResource Type.Body}" Margin="0,6,0,20"/><Border Background="#121611" BorderBrush="#2C3629" BorderThickness="1" CornerRadius="16" Padding="18"><StackPanel><TextBlock Text="ERASE LAUNCHER" Style="{StaticResource Type.Eyebrow}" Foreground="{StaticResource Brush.Accent}"/><TextBlock Text="Build 0.1.0" Foreground="{StaticResource Brush.Text}" FontSize="20" FontWeight="SemiBold" Margin="0,8,0,4"/><TextBlock Text="Downloads are served from Erase CDN and verified with SHA-256 before installation." Style="{StaticResource Type.Body}"/><Button Style="{StaticResource Button.Secondary}" Width="164" Height="52" HorizontalAlignment="Left" Margin="0,20,0,0" Command="{Binding OpenDiscordCommand}" Content="JOIN DISCORD"/></StackPanel></Border></StackPanel></Grid></ScrollViewer></Border></Grid>
-   <Grid Visibility="{Binding IsInstallation, Converter={StaticResource BooleanToVisibilityConverter}}" Background="#0E120D"><Border Width="560" Background="#161C14" BorderBrush="#33402E" BorderThickness="1" CornerRadius="22" Padding="38" HorizontalAlignment="Center" VerticalAlignment="Center"><StackPanel><TextBlock Text="INSTALLATION" Style="{StaticResource Type.Eyebrow}" Foreground="{StaticResource Brush.Accent}"/><TextBlock Text="{Binding InstallationMessage}" FontSize="25" FontWeight="SemiBold" Foreground="{StaticResource Brush.Text}" TextWrapping="Wrap" Margin="0,10,0,0"/><ProgressBar Height="8" Margin="0,28,0,10" Minimum="0" Maximum="100" Value="{Binding InstallationPercentage, Mode=OneWay}"/><Grid><TextBlock Text="{Binding InstallationPercentage, StringFormat={}{0:0}%}" Style="{StaticResource Type.Body}"/><Button HorizontalAlignment="Right" Width="124" Height="50" Style="{StaticResource Button.Secondary}" Command="{Binding CancelInstallationCommand}" Content="CANCEL"/></Grid><TextBlock Text="Every file is verified before Windows package changes begin." Style="{StaticResource Type.Body}" Margin="0,27,0,0"/></StackPanel></Border></Grid>
-  </Grid>
-  <Border Grid.RowSpan="2" Visibility="{Binding IsConfirmationOpen, Converter={StaticResource BooleanToVisibilityConverter}}" Background="#B8000000"><Grid><Border Width="480" Background="#192016" BorderBrush="#425139" BorderThickness="1" CornerRadius="22" Padding="32" HorizontalAlignment="Center" VerticalAlignment="Center"><StackPanel><TextBlock Text="Install this version?" Style="{StaticResource Type.PageTitle}" FontSize="29"/><TextBlock Text="{Binding SelectedVersion.DisplayName}" Foreground="{StaticResource Brush.Accent}" FontSize="17" FontWeight="SemiBold" Margin="0,12,0,0"/><TextBlock Text="Erase verifies all package files before it changes your installed Minecraft version." Style="{StaticResource Type.Body}" Margin="0,12,0,23"/><CheckBox Style="{StaticResource Toggle}" Content="Preserve worlds and packs" IsChecked="{Binding PreserveData}" Margin="0,0,0,26"/><StackPanel Orientation="Horizontal" HorizontalAlignment="Right"><Button Style="{StaticResource Button.Secondary}" Width="122" Height="52" Command="{Binding CancelConfirmationCommand}" Content="CANCEL" Margin="0,0,10,0"/><Button Style="{StaticResource Button.Primary}" Width="132" Height="52" Command="{Binding ConfirmInstallCommand}" Content="INSTALL"/></StackPanel></StackPanel></Border></Grid></Border>
- </Grid></Border>
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:EraseLauncher.ViewModels"
+        xmlns:c="clr-namespace:EraseLauncher.Controls"
+        Title="Erase Launcher" Width="1072" Height="672" ResizeMode="CanMinimize"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        WindowStartupLocation="CenterScreen" UseLayoutRounding="True" SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Ideal" FontFamily="{StaticResource Font.Body}"
+        Icon="pack://application:,,,/Assets/erase.ico">
+    <Window.InputBindings>
+        <KeyBinding Key="Escape" Command="{Binding CloseDialogsCommand}" />
+    </Window.InputBindings>
+
+    <!-- The 16px margin leaves room for the window shadow. -->
+    <Grid Margin="16">
+        <Border CornerRadius="18" Background="{StaticResource Brush.Background}">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="24" ShadowDepth="4" Direction="270" Opacity="0.55" Color="#000000" />
+            </Border.Effect>
+        </Border>
+
+        <Grid>
+            <Grid.Clip>
+                <RectangleGeometry Rect="0,0,1040,640" RadiusX="18" RadiusY="18" />
+            </Grid.Clip>
+
+            <!-- Ambient light the glass refracts. -->
+            <Canvas IsHitTestVisible="False">
+                <Rectangle Width="1040" Height="640" Fill="{StaticResource Brush.Background}" />
+                <Ellipse Canvas.Left="560" Canvas.Top="-320" Width="760" Height="620">
+                    <Ellipse.Fill>
+                        <RadialGradientBrush>
+                            <GradientStop Color="#33A8F038" Offset="0" />
+                            <GradientStop Color="#0FA8F038" Offset="0.5" />
+                            <GradientStop Color="#00A8F038" Offset="1" />
+                        </RadialGradientBrush>
+                    </Ellipse.Fill>
+                </Ellipse>
+                <Ellipse Canvas.Left="-300" Canvas.Top="300" Width="760" Height="620">
+                    <Ellipse.Fill>
+                        <RadialGradientBrush>
+                            <GradientStop Color="#2622C79A" Offset="0" />
+                            <GradientStop Color="#0A22C79A" Offset="0.5" />
+                            <GradientStop Color="#0022C79A" Offset="1" />
+                        </RadialGradientBrush>
+                    </Ellipse.Fill>
+                </Ellipse>
+                <Ellipse Canvas.Left="180" Canvas.Top="120" Width="700" Height="520">
+                    <Ellipse.Fill>
+                        <RadialGradientBrush>
+                            <GradientStop Color="#14315E1C" Offset="0" />
+                            <GradientStop Color="#00315E1C" Offset="1" />
+                        </RadialGradientBrush>
+                    </Ellipse.Fill>
+                </Ellipse>
+            </Canvas>
+            <Border CornerRadius="18" BorderThickness="1" IsHitTestVisible="False" Panel.ZIndex="10">
+                <Border.BorderBrush>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#2EFFFFFF" Offset="0" />
+                        <GradientStop Color="#0DFFFFFF" Offset="0.3" />
+                        <GradientStop Color="#0AFFFFFF" Offset="1" />
+                    </LinearGradientBrush>
+                </Border.BorderBrush>
+            </Border>
+
+            <!-- Shell. Blurred while a dialog is open so the dialog reads as glass above it. -->
+            <Grid x:Name="Shell">
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsDialogOpen}" Value="True">
+                                <Setter Property="Effect">
+                                    <Setter.Value>
+                                        <BlurEffect Radius="16" KernelType="Gaussian" />
+                                    </Setter.Value>
+                                </Setter>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="68" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- Title bar -->
+                <Grid Background="Transparent" MouseLeftButtonDown="TitleBar_OnMouseLeftButtonDown">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="24,0,0,0">
+                        <Border Width="32" Height="32" CornerRadius="9" BorderBrush="{StaticResource Brush.LineStrong}" BorderThickness="1">
+                            <Border.Background>
+                                <ImageBrush ImageSource="pack://application:,,,/Assets/erase-logo.jpg" Stretch="UniformToFill" Viewbox="0.25,0.25,0.5,0.5" />
+                            </Border.Background>
+                        </Border>
+                        <TextBlock Text="Erase" Style="{StaticResource Text.Title}" FontSize="16" Margin="12,0,0,1" VerticalAlignment="Center" />
+                        <TextBlock Text="Launcher" Style="{StaticResource Text.Label}" FontSize="13" Margin="6,1,0,0" VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <c:GlassPanel HorizontalAlignment="Center" VerticalAlignment="Center" CornerRadius="21" Padding="4">
+                        <Grid x:Name="NavHost">
+                            <Border x:Name="NavIndicator" HorizontalAlignment="Left" Width="0" Height="34" CornerRadius="17"
+                                    BorderBrush="{StaticResource Brush.GlassStroke}" BorderThickness="1">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                        <GradientStop Color="#24FFFFFF" Offset="0" />
+                                        <GradientStop Color="#12FFFFFF" Offset="1" />
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                                <Border.RenderTransform>
+                                    <TranslateTransform x:Name="NavIndicatorShift" />
+                                </Border.RenderTransform>
+                            </Border>
+                            <StackPanel Orientation="Horizontal">
+                                <RadioButton Style="{StaticResource NavItem}" GroupName="Nav" Checked="NavItem_OnChecked" SizeChanged="NavItem_OnSizeChanged"
+                                             IsChecked="{Binding IsHome}" AutomationProperties.Name="Home">
+                                    <StackPanel Orientation="Horizontal">
+                                        <ContentControl Style="{StaticResource Icon}" Tag="{StaticResource Icon.Home}" Width="15" Height="15" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
+                                        <TextBlock Text="Home" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </RadioButton>
+                                <RadioButton Style="{StaticResource NavItem}" GroupName="Nav" Checked="NavItem_OnChecked" SizeChanged="NavItem_OnSizeChanged"
+                                             IsChecked="{Binding IsVersions}" AutomationProperties.Name="Versions">
+                                    <StackPanel Orientation="Horizontal">
+                                        <ContentControl Style="{StaticResource Icon}" Tag="{StaticResource Icon.Layers}" Width="15" Height="15" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
+                                        <TextBlock Text="Versions" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </RadioButton>
+                                <RadioButton Style="{StaticResource NavItem}" GroupName="Nav" Checked="NavItem_OnChecked" SizeChanged="NavItem_OnSizeChanged"
+                                             IsChecked="{Binding IsSettings}" AutomationProperties.Name="Settings">
+                                    <StackPanel Orientation="Horizontal">
+                                        <ContentControl Style="{StaticResource Icon}" Tag="{StaticResource Icon.Settings}" Width="15" Height="15" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
+                                        <TextBlock Text="Settings" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </RadioButton>
+                                <RadioButton Style="{StaticResource NavItem}" GroupName="Nav" Checked="NavItem_OnChecked" SizeChanged="NavItem_OnSizeChanged"
+                                             Visibility="{Binding HasInstallSession, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                             IsChecked="{Binding IsInstallation}" AutomationProperties.Name="Install">
+                                    <StackPanel Orientation="Horizontal">
+                                        <ContentControl Style="{StaticResource Icon}" Tag="{StaticResource Icon.Download}" Width="15" Height="15" Foreground="{StaticResource Brush.Accent}" />
+                                        <TextBlock Text="{Binding InstallTabText}" Margin="8,0,0,0" VerticalAlignment="Center" FontFamily="{StaticResource Font.Body}" />
+                                    </StackPanel>
+                                </RadioButton>
+                            </StackPanel>
+                        </Grid>
+                    </c:GlassPanel>
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,18,0">
+                        <Button Style="{StaticResource Button.Icon}" Click="Minimize_OnClick" ToolTip="Minimize">
+                            <ContentControl Style="{StaticResource Icon}" Tag="{StaticResource Icon.Minus}" Width="16" Height="16" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                        </Button>
+                        <Button Style="{StaticResource Button.WindowClose}" Click="Close_OnClick" ToolTip="Close" Margin="4,0,0,0">
+                            <ContentControl Style="{StaticResource Icon}" Tag="{StaticResource Icon.Close}" Width="16" Height="16" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
+                <Grid Grid.Row="1" Margin="24,4,24,24">
+                    <!-- HOME -->
+                    <Grid Style="{StaticResource Page}" Visibility="{Binding IsHome, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="300" />
+                        </Grid.ColumnDefinitions>
+
+                        <c:GlassPanel CornerRadius="20" Padding="0">
+                            <Grid>
+                                <!-- Brand art sits on the right and fades into the glass; the wordmark is cropped away. -->
+                                <Border CornerRadius="0,20,20,0" Margin="1" Width="520" HorizontalAlignment="Right" Opacity="0.95">
+                                    <Border.Background>
+                                        <ImageBrush ImageSource="pack://application:,,,/Assets/erase-logo.jpg" Stretch="UniformToFill" Viewbox="0.05,0.08,0.9,0.62" />
+                                    </Border.Background>
+                                    <Border.OpacityMask>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                            <GradientStop Color="#00000000" Offset="0" />
+                                            <GradientStop Color="#FF000000" Offset="0.55" />
+                                        </LinearGradientBrush>
+                                    </Border.OpacityMask>
+                                </Border>
+                                <Border CornerRadius="20" Margin="1">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                            <GradientStop Color="#F5070A07" Offset="0" />
+                                            <GradientStop Color="#D9070A07" Offset="0.42" />
+                                            <GradientStop Color="#4D070A07" Offset="0.8" />
+                                            <GradientStop Color="#1A070A07" Offset="1" />
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+                                <Border CornerRadius="20" Margin="1">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                            <GradientStop Color="#00070A07" Offset="0.55" />
+                                            <GradientStop Color="#B3070A07" Offset="1" />
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+
+                                <Grid Margin="36,32,36,34">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Border Style="{StaticResource Chip}" HorizontalAlignment="Left" CornerRadius="999" Padding="12,5" Background="#14FFFFFF">
+                                        <TextBlock Text="Minecraft Bedrock" Style="{StaticResource Text.Label}" Foreground="{StaticResource Brush.Text2}" />
+                                    </Border>
+
+                                    <StackPanel Grid.Row="2">
+                                        <TextBlock Text="Installed version" Style="{StaticResource Text.Label}" FontSize="13" />
+                                        <TextBlock Text="{Binding InstalledVersionText}" Style="{StaticResource Text.Hero}" Margin="-2,2,0,0" />
+                                        <TextBlock Text="{Binding InstalledDetail}" Style="{StaticResource Text.Body}" FontSize="14" Margin="0,4,0,0" MaxWidth="380" HorizontalAlignment="Left" />
+
+                                        <StackPanel Orientation="Horizontal" Margin="0,28,0,0">
+                                            <Button Style="{StaticResource Button.Primary}" Height="48" MinWidth="168" Padding="22,0" Command="{Binding PlayCommand}">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <ContentControl Style="{StaticResource Icon.Filled}" Tag="{StaticResource Icon.Play}" Width="14" Height="14" Foreground="{StaticResource Brush.AccentInk}" />
+                                                    <TextBlock Text="Play" FontSize="15" Margin="10,0,0,0" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </Button>
+                                            <Button Style="{StaticResource Button.Glass}" Height="48" Padding="20,0" Margin="10,0,0,0"
+                                                    Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:LauncherPage.Versions}" AutomationProperties.Name="Versions">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <ContentControl Style="{StaticResource Icon}" Tag="{StaticResource Icon.Layers}" Width="16" Height="16" Foreground="{StaticResource Brush.Text}" />
+                                                    <TextBlock Text="Versions" Margin="9,0,0,0" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </Button>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Grid>
+                            </Grid>
+                        </c:GlassPanel>
+
+                        <DockPanel Grid.Column="2" LastChildFill="False">
+                            <!-- Live CDN state -->
+                            <c:GlassPanel DockPanel.Dock="Top">
+                                <StackPanel>
+                                    <Grid>
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Ellipse Width="7" Height="7" VerticalAlignment="Center" Margin="0,0,8,0">
+                                                <Ellipse.Style>
+                                                    <Style TargetType="Ellipse">
+                                                        <Setter Property="Fill" Value="{StaticResource Brush.Warning}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsManifestOnline}" Value="True">
+                                                                <Setter Property="Fill" Value="{StaticResource Brush.Accent}" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding IsManifestOffline}" Value="True">
+                                                                <Setter Property="Fill" Value="{StaticResource Brush.Danger}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Ellipse.Style>
+                                            </Ellipse>
+                                            <TextBlock Text="Erase CDN" Style="{StaticResource Text.Label}" />
+                                        </StackPanel>
+                                        <Button Style="{StaticResource Button.Icon}" Width="28" Height="28" HorizontalAlignment="Right" Margin="0,-6,-8,-6"
+                                                Command="{Binding RefreshCommand}" ToolTip="Check again">
+                                            <ContentControl Style="{StaticResource Icon}" Tag="{StaticResource Icon.Refresh}" Width="14" Height="14" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                        </Button>
+                                    </Grid>
+                                    <TextBlock Text="{Binding ManifestStatus}" Style="{StaticResource Text.Title}" FontSize="15" Margin="0,10,0,0" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </c:GlassPanel>
+
+                            <!-- Running installation shortcut -->
+                            <c:GlassPanel DockPanel.Dock="Top" Margin="0,12,0,0"
+                                          Visibility="{Binding IsInstallRunning, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <StackPanel>
+                                    <Grid>
+                                        <TextBlock Text="{Binding InstallationTitle}" Style="{StaticResource Text.Base}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Margin="0,0,48,0" />
+                                        <TextBlock Text="{Binding InstallationPercentText}" Style="{StaticResource Text.Mono}" Foreground="{StaticResource Brush.Accent}" HorizontalAlignment="Right" />
+                                    </Grid>
+                                    <Grid Height="4" Margin="0,12,0,14">
+                                        <Border CornerRadius="2" Background="{StaticResource Brush.Track}" />
+                                        <Border CornerRadius="2" HorizontalAlignment="Left" Background="{StaticResource Brush.AccentFill}" c:SmoothProgress.Fraction="{Binding InstallationFraction}" />
+                                    </Grid>
+                                    <Button Style="{StaticResource Button.Glass}" Height="34" HorizontalAlignment="Left"
+                                            Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:LauncherPage.Installation}" Content="View progress" />
+                                </StackPanel>
+                            </c:GlassPanel>
+
+                            <c:GlassPanel DockPanel.Dock="Top" Margin="0,12,0,0">
+                                <StackPanel>
+                                    <Border Width="36" Height="36" CornerRadius="10" HorizontalAlignment="Left" Background="{StaticResource Brush.AccentSoft}" BorderBrush="{StaticResource Brush.AccentLine}" BorderThickness="1">
+                                        <ContentControl Style="{StaticResource Icon}" Tag="{StaticResource Icon.Shield}" Width="18" Height="18" Foreground="{StaticResource Brush.Accent}" />
+                                    </Border>
+                                    <TextBlock Text="Verified installs" Style="{StaticResource Text.Title}" FontSize="15" Margin="0,14,0,0" />
+                                    <TextBlock Text="Every file is checked with SHA-256 before Windows changes anything." Style="{StaticResource Text.Body}" Margin="0,4,0,0" />
+                                </StackPanel>
+                            </c:GlassPanel>
+
+                            <c:GlassPanel DockPanel.Dock="Bottom">
+                                <StackPanel>
+                                    <TextBlock Text="Erase community" Style="{StaticResource Text.Title}" FontSize="15" />
+                                    <TextBlock Text="News, support and server status." Style="{StaticResource Text.Body}" Margin="0,4,0,14" />
+                                    <Button Style="{StaticResource Button.Glass}" Height="38" HorizontalAlignment="Stretch" Command="{Binding OpenDiscordCommand}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ContentControl Style="{StaticResource Icon}" Tag="{StaticResource Icon.Message}" Width="15" Height="15" Foreground="{StaticResource Brush.Text}" />
+                                            <TextBlock Text="Join Discord" Margin="9,0,0,0" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                            </c:GlassPanel>
+                        </DockPanel>
+                    </Grid>
+
+                    <!-- VERSIONS -->
+                    <Grid Style="{StaticResource Page}" Visibility="{Binding IsVersions, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Grid Margin="4,8,0,20">
+                            <StackPanel>
+                                <TextBlock Text="Versions" Style="{StaticResource Text.PageTitle}" />
+                                <TextBlock Text="Verified legacy Bedrock builds for Erase servers." Style="{StaticResource Text.Body}" FontSize="14" Margin="0,4,0,0" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding ManifestStatus}" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Margin="0,0,14,0" />
+                                <Button Style="{StaticResource Button.Glass}" Command="{Binding RefreshCommand}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <ContentControl Style="{StaticResource Icon}" Tag="{StaticResource Icon.Refresh}" Width="15" Height="15" Foreground="{StaticResource Brush.Text}" />
+                                        <TextBlock Text="Refresh" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,0,-10,0" Padding="0,0,10,0">
+                            <ItemsControl ItemsSource="{Binding Versions}" Focusable="False">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type vm:VersionCardViewModel}">
+                                        <c:GlassPanel Margin="0,0,0,10" Padding="18,16">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <Border Width="46" Height="46" CornerRadius="12" Background="{StaticResource Brush.AccentSoft}" BorderBrush="{StaticResource Brush.AccentLine}" BorderThickness="1">
+                                                    <ContentControl Style="{StaticResource Icon}" Tag="{StaticResource Icon.Package}" Width="20" Height="20" Foreground="{StaticResource Brush.Accent}" />
+                                                </Border>
+                                                <StackPanel Grid.Column="1" Margin="16,0,0,0" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Id}" Style="{StaticResource Text.Base}" FontFamily="{StaticResource Font.Mono}" FontSize="19" FontWeight="SemiBold" />
+                                                    <TextBlock Text="{Binding DisplayName}" Style="{StaticResource Text.Body}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,16,0">
+                                                    <Border Style="{StaticResource Chip.Accent}" Margin="0,0,8,0"
+                                                            Visibility="{Binding IsInstalled, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <ContentControl Style="{StaticResource Icon}" Tag="{StaticResource Icon.Check}" Width="12" Height="12" Foreground="{StaticResource Brush.Accent}" />
+                                                            <TextBlock Text="Installed" Style="{StaticResource Text.Label}" Foreground="{StaticResource Brush.Accent}" Margin="5,0,0,0" />
+                                                        </StackPanel>
+                                                    </Border>
+                                                    <Border Style="{StaticResource Chip}">
+                                                        <TextBlock Text="{Binding SizeText}" Style="{StaticResource Text.Mono}" />
+                                                    </Border>
+                                                </StackPanel>
+                                                <Button Grid.Column="3" MinWidth="116" Content="{Binding ActionText}"
+                                                        Command="{Binding DataContext.OpenInstallCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}">
+                                                    <Button.Style>
+                                                        <Style TargetType="Button" BasedOn="{StaticResource Button.Primary}">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsInstalled}" Value="True">
+                                                                    <Setter Property="Background" Value="{StaticResource Brush.GlassFill}" />
+                                                                    <Setter Property="BorderBrush" Value="{StaticResource Brush.GlassStroke}" />
+                                                                    <Setter Property="BorderThickness" Value="1" />
+                                                                    <Setter Property="Foreground" Value="{StaticResource Brush.Text}" />
+                                                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
+                                            </Grid>
+                                        </c:GlassPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+
+                        <!-- Loading -->
+                        <StackPanel Grid.Row="1" Visibility="{Binding IsManifestLoading, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Style.Triggers>
+                                        <Trigger Property="IsVisible" Value="True">
+                                            <Trigger.EnterActions>
+                                                <BeginStoryboard>
+                                                    <Storyboard RepeatBehavior="Forever" AutoReverse="True" Timeline.DesiredFrameRate="30">
+                                                        <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1" To="0.45" Duration="0:0:0.9" />
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </Trigger.EnterActions>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <c:GlassPanel Height="80" Margin="0,0,0,10" />
+                            <c:GlassPanel Height="80" Margin="0,0,0,10" Opacity="0.7" />
+                        </StackPanel>
+
+                        <!-- Offline -->
+                        <c:GlassPanel Grid.Row="1" VerticalAlignment="Top" Padding="28" Visibility="{Binding IsManifestOffline, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Border Width="46" Height="46" CornerRadius="12" Background="{StaticResource Brush.DangerSoft}" BorderBrush="{StaticResource Brush.DangerLine}" BorderThickness="1">
+                                    <ContentControl Style="{StaticResource Icon}" Tag="{StaticResource Icon.Server}" Width="20" Height="20" Foreground="{StaticResource Brush.Danger}" />
+                                </Border>
+                                <StackPanel Grid.Column="1" Margin="16,0" VerticalAlignment="Center">
+                                    <TextBlock Text="Could not reach Erase CDN" Style="{StaticResource Text.Title}" />
+                                    <TextBlock Text="Check your internet connection, then try again. Versions only come from the verified CDN." Style="{StaticResource Text.Body}" Margin="0,3,0,0" />
+                                </StackPanel>
+                                <Button Grid.Column="2" Style="{StaticResource Button.Primary}" Content="Try again" Command="{Binding RefreshCommand}" />
+                            </Grid>
+                        </c:GlassPanel>
+                    </Grid>
+
+                    <!-- SETTINGS -->
+                    <Grid Style="{StaticResource Page}" Visibility="{Binding IsSettings, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <StackPanel Margin="4,8,0,20">
+                            <TextBlock Text="Settings" Style="{StaticResource Text.PageTitle}" />
+                            <TextBlock Text="Changes are saved as you make them." Style="{StaticResource Text.Body}" FontSize="14" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <Grid Grid.Row="1">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <c:GlassPanel VerticalAlignment="Top" Padding="24,22">
+                                <StackPanel>
+                                    <TextBlock Text="Installation" Style="{StaticResource Text.Title}" />
+                                    <CheckBox Style="{StaticResource Switch}" Margin="0,20,0,0" IsChecked="{Binding LaunchAfterInstall}">
+                                        <StackPanel>
+                                            <TextBlock Text="Launch after installing" Style="{StaticResource Text.Base}" FontWeight="Medium" />
+                                            <TextBlock Text="Start Minecraft as soon as the installation finishes." Style="{StaticResource Text.Body}" Margin="0,2,0,0" />
+                                        </StackPanel>
+                                    </CheckBox>
+                                    <Rectangle Height="1" Fill="{StaticResource Brush.Line}" Margin="0,16" />
+                                    <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding PreserveDataByDefault}">
+                                        <StackPanel>
+                                            <TextBlock Text="Keep worlds and packs" Style="{StaticResource Text.Base}" FontWeight="Medium" />
+                                            <TextBlock Text="Back up com.mojang before replacing Minecraft and restore it afterwards." Style="{StaticResource Text.Body}" Margin="0,2,0,0" />
+                                        </StackPanel>
+                                    </CheckBox>
+                                    <Rectangle Height="1" Fill="{StaticResource Brush.Line}" Margin="0,16" />
+                                    <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding OpenDiscordAfterFirstInstall}">
+                                        <StackPanel>
+                                            <TextBlock Text="Open Discord after the first install" Style="{StaticResource Text.Base}" FontWeight="Medium" />
+                                            <TextBlock Text="Join the Erase community once Minecraft is ready." Style="{StaticResource Text.Body}" Margin="0,2,0,0" />
+                                        </StackPanel>
+                                    </CheckBox>
+                                </StackPanel>
+                            </c:GlassPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <c:GlassPanel Padding="24,22">
+                                    <StackPanel>
+                                        <Grid>
+                                            <TextBlock Text="Storage" Style="{StaticResource Text.Title}" />
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                <TextBlock Text="Cache" Style="{StaticResource Text.Label}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                                <Border Style="{StaticResource Chip}">
+                                                    <TextBlock Text="{Binding CacheSizeText}" Style="{StaticResource Text.Mono}" />
+                                                </Border>
+                                            </StackPanel>
+                                        </Grid>
+                                        <TextBlock Text="Verified downloads are cached so reinstalling is instant. Clearing the cache never touches worlds or installed packages." Style="{StaticResource Text.Body}" Margin="0,10,0,16" />
+                                        <WrapPanel>
+                                            <Button Style="{StaticResource Button.Glass}" Padding="14,0" Command="{Binding OpenLauncherFolderCommand}" Margin="0,0,8,8">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <ContentControl Style="{StaticResource Icon}" Tag="{StaticResource Icon.Folder}" Width="15" Height="15" Foreground="{StaticResource Brush.Text}" />
+                                                    <TextBlock Text="Open folder" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </Button>
+                                            <Button Style="{StaticResource Button.Glass}" Padding="14,0" Command="{Binding ClearCacheCommand}" Margin="0,0,4,8">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <ContentControl Style="{StaticResource Icon}" Tag="{StaticResource Icon.Trash}" Width="15" Height="15" Foreground="{StaticResource Brush.Text}" />
+                                                    <TextBlock Text="Clear cache" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </Button>
+                                            <Button Style="{StaticResource Button.Ghost}" Padding="10,0" Command="{Binding OpenLogsFolderCommand}" Margin="0,0,0,8">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <ContentControl Style="{StaticResource Icon}" Tag="{StaticResource Icon.FileText}" Width="15" Height="15" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                                    <TextBlock Text="Logs" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </Button>
+                                            <Button Style="{StaticResource Button.Ghost}" Padding="10,0" Command="{Binding OpenBackupsFolderCommand}" Margin="0,0,0,8">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <ContentControl Style="{StaticResource Icon}" Tag="{StaticResource Icon.Folder}" Width="15" Height="15" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                                    <TextBlock Text="Backups" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </Button>
+                                        </WrapPanel>
+                                        <TextBlock Text="{Binding StorageMessage}" Foreground="{StaticResource Brush.Accent}" Margin="0,4,0,0">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Body}">
+                                                    <Style.Triggers>
+                                                        <Trigger Property="Text" Value="">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </c:GlassPanel>
+
+                                <c:GlassPanel Padding="24,22" Margin="0,16,0,0">
+                                    <StackPanel>
+                                        <Grid>
+                                            <StackPanel Orientation="Horizontal">
+                                                <Border Width="36" Height="36" CornerRadius="10" BorderBrush="{StaticResource Brush.LineStrong}" BorderThickness="1">
+                                                    <Border.Background>
+                                                        <ImageBrush ImageSource="pack://application:,,,/Assets/erase-logo.jpg" Stretch="UniformToFill" Viewbox="0.25,0.25,0.5,0.5" />
+                                                    </Border.Background>
+                                                </Border>
+                                                <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+                                                    <TextBlock Text="Erase Launcher" Style="{StaticResource Text.Title}" FontSize="15" />
+                                                    <TextBlock Style="{StaticResource Text.Mono}" Margin="0,1,0,0">
+                                                        <Run Text="Version" FontFamily="{StaticResource Font.Body}" /> <Run Text="{Binding LauncherVersion, Mode=OneWay}" />
+                                                    </TextBlock>
+                                                </StackPanel>
+                                            </StackPanel>
+                                            <Button Style="{StaticResource Button.Glass}" HorizontalAlignment="Right" VerticalAlignment="Center" Command="{Binding OpenDiscordCommand}">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="Discord" VerticalAlignment="Center" />
+                                                    <ContentControl Style="{StaticResource Icon}" Tag="{StaticResource Icon.External}" Width="13" Height="13" Margin="8,0,0,0" Foreground="{StaticResource Brush.Text2}" />
+                                                </StackPanel>
+                                            </Button>
+                                        </Grid>
+                                        <TextBlock Text="An independent community utility. Not affiliated with, endorsed by, or provided by Mojang or Microsoft." Style="{StaticResource Text.Body}" Margin="0,14,0,0" />
+                                    </StackPanel>
+                                </c:GlassPanel>
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+
+                    <!-- INSTALLATION -->
+                    <Grid Style="{StaticResource Page}" Visibility="{Binding IsInstallation, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <c:GlassPanel Width="620" HorizontalAlignment="Center" VerticalAlignment="Center" CornerRadius="20" Padding="32,28,32,28">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Style="{StaticResource Chip}">
+                                        <TextBlock Style="{StaticResource Text.Mono}">
+                                            <Run Text="Minecraft" FontFamily="{StaticResource Font.Body}" /> <Run Text="{Binding SelectedVersion.Id, Mode=OneWay}" />
+                                        </TextBlock>
+                                    </Border>
+                                </StackPanel>
+
+                                <Grid Margin="0,16,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding InstallationTitle}" Style="{StaticResource Text.PageTitle}" FontSize="24" TextWrapping="Wrap" VerticalAlignment="Bottom" Margin="0,0,16,4" />
+                                    <TextBlock Grid.Column="1" Text="{Binding InstallationPercentText}" FontFamily="{StaticResource Font.Mono}" FontSize="40" FontWeight="SemiBold" VerticalAlignment="Bottom">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="{StaticResource Brush.Text}" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsInstallSucceeded}" Value="True">
+                                                        <Setter Property="Foreground" Value="{StaticResource Brush.Accent}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsInstallStopped}" Value="True">
+                                                        <Setter Property="Foreground" Value="{StaticResource Brush.Text3}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Grid>
+
+                                <!-- Progress track: the fill glides between reports and a light sweeps across it while work is running. -->
+                                <Grid Height="10" Margin="0,18,0,0">
+                                    <Border CornerRadius="5" Background="{StaticResource Brush.Track}" />
+                                    <Border CornerRadius="5" HorizontalAlignment="Left" c:SmoothProgress.Fraction="{Binding InstallationFraction}">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="{StaticResource Brush.AccentFill}" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsInstallFailed}" Value="True">
+                                                        <Setter Property="Background" Value="{StaticResource Brush.Danger}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsInstallCancelled}" Value="True">
+                                                        <Setter Property="Background" Value="{StaticResource Brush.Text3}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <Border CornerRadius="5" Visibility="{Binding IsInstallRunning, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                            <Border.Background>
+                                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                                    <LinearGradientBrush.RelativeTransform>
+                                                        <TranslateTransform x:Name="SheenShift" X="-1" />
+                                                    </LinearGradientBrush.RelativeTransform>
+                                                    <GradientStop Color="#00FFFFFF" Offset="0.3" />
+                                                    <GradientStop Color="#73FFFFFF" Offset="0.5" />
+                                                    <GradientStop Color="#00FFFFFF" Offset="0.7" />
+                                                </LinearGradientBrush>
+                                            </Border.Background>
+                                            <Border.Triggers>
+                                                <EventTrigger RoutedEvent="Loaded">
+                                                    <BeginStoryboard>
+                                                        <Storyboard RepeatBehavior="Forever" Timeline.DesiredFrameRate="40">
+                                                            <DoubleAnimation Storyboard.TargetName="SheenShift" Storyboard.TargetProperty="X" From="-1" To="1" Duration="0:0:1.6" />
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </EventTrigger>
+                                            </Border.Triggers>
+                                        </Border>
+                                    </Border>
+                                </Grid>
+
+                                <TextBlock Text="{Binding InstallationDetail}" Style="{StaticResource Text.Mono}" Margin="0,12,0,0" MinHeight="16" TextWrapping="Wrap"
+                                           Visibility="{Binding IsInstallFailed, Converter={StaticResource InverseBooleanToVisibilityConverter}}" />
+
+                                <Border Margin="0,14,0,0" Padding="14,12" CornerRadius="12" Background="{StaticResource Brush.DangerSoft}" BorderBrush="{StaticResource Brush.DangerLine}" BorderThickness="1"
+                                        Visibility="{Binding IsInstallFailed, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <ContentControl Style="{StaticResource Icon}" Tag="{StaticResource Icon.Alert}" Width="18" Height="18" VerticalAlignment="Top" Margin="0,1,0,0" Foreground="{StaticResource Brush.Danger}" />
+                                        <TextBlock Grid.Column="1" Text="{Binding InstallationDetail}" Style="{StaticResource Text.Body}" Foreground="{StaticResource Brush.Text}" Margin="12,0,0,0" />
+                                    </Grid>
+                                </Border>
+
+                                <!-- Steps -->
+                                <Grid Margin="0,26,0,0">
+                                    <Rectangle Height="1" Fill="{StaticResource Brush.LineStrong}" VerticalAlignment="Top" Margin="56,11,56,0" />
+                                    <ItemsControl ItemsSource="{Binding Steps}" Focusable="False">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <UniformGrid Rows="1" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate DataType="{x:Type vm:InstallStepViewModel}">
+                                                <StackPanel HorizontalAlignment="Center">
+                                                    <Grid Width="24" Height="24">
+                                                        <Ellipse x:Name="Dot" Fill="#FF0C100C" Stroke="{StaticResource Brush.LineStrong}" StrokeThickness="1.5" />
+                                                        <Ellipse x:Name="Core" Width="8" Height="8" Fill="{StaticResource Brush.Text3}" Opacity="0.6" />
+                                                        <ContentControl x:Name="Mark" Style="{StaticResource Icon}" Width="13" Height="13" Visibility="Collapsed" Foreground="{StaticResource Brush.AccentInk}" Tag="{StaticResource Icon.Check}" />
+                                                    </Grid>
+                                                    <TextBlock x:Name="Label" Text="{Binding Title}" Style="{StaticResource Text.Label}" HorizontalAlignment="Center" Margin="0,8,0,0" />
+                                                </StackPanel>
+                                                <DataTemplate.Triggers>
+                                                    <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                        <Setter TargetName="Dot" Property="Stroke" Value="{StaticResource Brush.Accent}" />
+                                                        <Setter TargetName="Dot" Property="Fill" Value="#FF132011" />
+                                                        <Setter TargetName="Core" Property="Fill" Value="{StaticResource Brush.Accent}" />
+                                                        <Setter TargetName="Core" Property="Opacity" Value="1" />
+                                                        <Setter TargetName="Label" Property="Foreground" Value="{StaticResource Brush.Text}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsDone}" Value="True">
+                                                        <Setter TargetName="Dot" Property="Fill" Value="{StaticResource Brush.Accent}" />
+                                                        <Setter TargetName="Dot" Property="Stroke" Value="{StaticResource Brush.Accent}" />
+                                                        <Setter TargetName="Core" Property="Visibility" Value="Collapsed" />
+                                                        <Setter TargetName="Mark" Property="Visibility" Value="Visible" />
+                                                        <Setter TargetName="Label" Property="Foreground" Value="{StaticResource Brush.Text2}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsFailed}" Value="True">
+                                                        <Setter TargetName="Dot" Property="Fill" Value="{StaticResource Brush.Danger}" />
+                                                        <Setter TargetName="Dot" Property="Stroke" Value="{StaticResource Brush.Danger}" />
+                                                        <Setter TargetName="Core" Property="Visibility" Value="Collapsed" />
+                                                        <Setter TargetName="Mark" Property="Visibility" Value="Visible" />
+                                                        <Setter TargetName="Mark" Property="Tag" Value="{StaticResource Icon.Close}" />
+                                                        <Setter TargetName="Mark" Property="Foreground" Value="#FF2A0A0A" />
+                                                        <Setter TargetName="Label" Property="Foreground" Value="{StaticResource Brush.Danger}" />
+                                                    </DataTrigger>
+                                                </DataTemplate.Triggers>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Grid>
+
+                                <Rectangle Height="1" Fill="{StaticResource Brush.Line}" Margin="0,24,0,20" />
+
+                                <Grid>
+                                    <TextBlock VerticalAlignment="Center" Margin="0,0,16,0" MaxWidth="300" HorizontalAlignment="Left">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Body}">
+                                                <Setter Property="Text" Value="Files are verified with SHA-256 before anything changes." />
+                                                <Style.Triggers>
+                                                    <MultiDataTrigger>
+                                                        <MultiDataTrigger.Conditions>
+                                                            <Condition Binding="{Binding IsInstallRunning}" Value="True" />
+                                                            <Condition Binding="{Binding CanCancelInstallation}" Value="False" />
+                                                        </MultiDataTrigger.Conditions>
+                                                        <Setter Property="Text" Value="Keep the launcher open until Windows finishes." />
+                                                    </MultiDataTrigger>
+                                                    <DataTrigger Binding="{Binding IsInstallSucceeded}" Value="True">
+                                                        <Setter Property="Text" Value="Minecraft is installed. Have fun on Erase." />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsInstallFailed}" Value="True">
+                                                        <Setter Property="Text" Value="Nothing was replaced unless the steps above say so. The log has full details." />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <!-- Running -->
+                                        <Button Style="{StaticResource Button.Glass}" MinWidth="104" Content="Cancel" Command="{Binding CancelInstallationCommand}"
+                                                Visibility="{Binding IsInstallRunning, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                        <!-- Failed -->
+                                        <Button Style="{StaticResource Button.Ghost}" Content="Open logs" Command="{Binding OpenLogsFolderCommand}" Margin="0,0,8,0"
+                                                Visibility="{Binding IsInstallFailed, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                        <!-- Finished -->
+                                        <Button Style="{StaticResource Button.Glass}" MinWidth="96" Content="Close" Command="{Binding FinishInstallCommand}"
+                                                Visibility="{Binding IsInstallStopped, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                        <Button Style="{StaticResource Button.Primary}" MinWidth="112" Margin="8,0,0,0" Command="{Binding RetryInstallCommand}"
+                                                Visibility="{Binding IsInstallStopped, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                            <TextBlock>
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Text" Value="Try again" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsInstallCancelled}" Value="True">
+                                                                <Setter Property="Text" Value="Resume" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </Button>
+                                        <Button Style="{StaticResource Button.Glass}" MinWidth="96" Content="Done" Command="{Binding FinishInstallCommand}"
+                                                Visibility="{Binding IsInstallSucceeded, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                        <Button Style="{StaticResource Button.Primary}" MinWidth="120" Margin="8,0,0,0" Command="{Binding PlayCommand}"
+                                                Visibility="{Binding IsInstallSucceeded, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                            <StackPanel Orientation="Horizontal">
+                                                <ContentControl Style="{StaticResource Icon.Filled}" Tag="{StaticResource Icon.Play}" Width="12" Height="12" Foreground="{StaticResource Brush.AccentInk}" />
+                                                <TextBlock Text="Play" Margin="9,0,0,0" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </c:GlassPanel>
+                    </Grid>
+                </Grid>
+            </Grid>
+
+            <!-- DIALOGS -->
+            <Grid Visibility="{Binding IsDialogOpen, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource Page}">
+                <Border Background="#8C040604">
+                    <Border.InputBindings>
+                        <MouseBinding MouseAction="LeftClick" Command="{Binding CloseDialogsCommand}" />
+                    </Border.InputBindings>
+                </Border>
+
+                <c:GlassPanel Width="440" HorizontalAlignment="Center" VerticalAlignment="Center" CornerRadius="20" Padding="28,26"
+                              Background="{StaticResource Brush.GlassFillStrong}"
+                              Visibility="{Binding IsConfirmationOpen, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource Text.PageTitle}" FontSize="22" TextWrapping="Wrap">
+                            <Run Text="Install Minecraft" /> <Run Text="{Binding SelectedVersion.Id, Mode=OneWay}" FontFamily="{StaticResource Font.Mono}" Foreground="{StaticResource Brush.Accent}" /><Run Text="?" />
+                        </TextBlock>
+                        <TextBlock Text="Erase downloads and verifies every file before Windows changes anything." Style="{StaticResource Text.Body}" FontSize="14" Margin="0,8,0,0" />
+
+                        <Border Margin="0,20,0,0" Padding="16,4" CornerRadius="12" Background="#0AFFFFFF" BorderBrush="{StaticResource Brush.Line}" BorderThickness="1">
+                            <StackPanel>
+                                <Grid Margin="0,10">
+                                    <TextBlock Text="Download size" Style="{StaticResource Text.Body}" />
+                                    <TextBlock Text="{Binding SelectedVersion.SizeText}" Style="{StaticResource Text.Mono}" Foreground="{StaticResource Brush.Text}" HorizontalAlignment="Right" />
+                                </Grid>
+                                <Rectangle Height="1" Fill="{StaticResource Brush.Line}" />
+                                <TextBlock Text="{Binding ReplaceNotice}" Style="{StaticResource Text.Body}" Margin="0,10" />
+                            </StackPanel>
+                        </Border>
+
+                        <CheckBox Style="{StaticResource Switch}" Margin="0,18,0,0" IsChecked="{Binding PreserveData}">
+                            <StackPanel>
+                                <TextBlock Text="Keep worlds and packs" Style="{StaticResource Text.Base}" FontWeight="Medium" />
+                                <TextBlock Text="A backup is kept in the launcher folder either way." Style="{StaticResource Text.Body}" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </CheckBox>
+
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,26,0,0">
+                            <Button Style="{StaticResource Button.Glass}" MinWidth="96" Content="Cancel" Command="{Binding CancelConfirmationCommand}" />
+                            <Button Style="{StaticResource Button.Primary}" MinWidth="120" Margin="8,0,0,0" Command="{Binding ConfirmInstallCommand}" IsDefault="{Binding IsConfirmationOpen}">
+                                <StackPanel Orientation="Horizontal">
+                                    <ContentControl Style="{StaticResource Icon}" Tag="{StaticResource Icon.Download}" Width="15" Height="15" Foreground="{StaticResource Brush.AccentInk}" />
+                                    <TextBlock Text="Install" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </StackPanel>
+                </c:GlassPanel>
+
+                <c:GlassPanel Width="420" HorizontalAlignment="Center" VerticalAlignment="Center" CornerRadius="20" Padding="28,26"
+                              Background="{StaticResource Brush.GlassFillStrong}"
+                              Visibility="{Binding IsCloseWarningOpen, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <StackPanel>
+                        <TextBlock Text="Installation in progress" Style="{StaticResource Text.PageTitle}" FontSize="22" />
+                        <TextBlock Text="Closing now could leave Minecraft half installed. Cancel the installation first, or wait until it finishes." Style="{StaticResource Text.Body}" FontSize="14" Margin="0,8,0,0" />
+                        <Button Style="{StaticResource Button.Primary}" MinWidth="96" HorizontalAlignment="Right" Margin="0,24,0,0" Content="Got it" Command="{Binding DismissCloseWarningCommand}" />
+                    </StackPanel>
+                </c:GlassPanel>
+            </Grid>
+        </Grid>
+    </Grid>
 </Window>
