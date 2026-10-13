@@ -29,17 +29,30 @@ public sealed class InstallationService(
                 throw new InvalidOperationException("Close Minecraft before changing its version.");
             }
 
+            if (version.Format == PackageFormat.Msixvc &&
+                !await packageService.IsInstalledAsync(PackageService.GamingServicesFamilyName, null, cancellationToken))
+            {
+                throw new GamingServicesMissingException();
+            }
+
             var missingDependencies = new List<DependencyArtifact>();
             foreach (var dependency in version.Dependencies)
             {
                 if (string.IsNullOrWhiteSpace(dependency.PackageFamilyName) ||
-                    !await packageService.IsInstalledAsync(dependency.PackageFamilyName, cancellationToken))
+                    !await packageService.IsInstalledAsync(dependency.PackageFamilyName, dependency.MinVersion, cancellationToken))
                 {
                     missingDependencies.Add(dependency);
                 }
             }
 
             var existing = await minecraftService.GetInstallationAsync(cancellationToken);
+
+            // A GDK build replaces another GDK build in place. Every other switch (UWP to GDK,
+            // GDK to UWP, UWP to UWP) removes the installed package first.
+            var removeExisting = existing is not null && !(version.Format == PackageFormat.Msixvc && existing.IsGdk);
+
+            // Only removing a package deletes its data, so that is the only case that needs a backup.
+            var backupData = request.PreserveData && removeExisting;
             var packageArtifacts = new List<DownloadArtifact> { version.Package };
             if (version.Certificate is not null)
             {
@@ -53,10 +66,10 @@ public sealed class InstallationService(
             reporter.Plan = InstallationProgressPlan.Create(new InstallationPlanOptions(
                 DependencyBytes: missingDependencies.Sum(dependency => dependency.Size),
                 PackageBytes: packageArtifacts.Sum(artifact => artifact.Size),
-                BackupData: request.PreserveData,
+                BackupData: backupData,
                 InstallCertificate: version.Certificate is not null,
                 DependencyCount: missingDependencies.Count,
-                RemoveExisting: existing is not null));
+                RemoveExisting: removeExisting));
             reporter.Report(InstallationState.CheckingPrerequisites, "Checking Windows components", 1);
 
             var dependencyPaths = await DownloadAllAsync(InstallationState.DownloadingDependencies, "Downloading Windows components", missingDependencies, reporter, cancellationToken);
@@ -65,7 +78,7 @@ public sealed class InstallationService(
             var certificatePath = version.Certificate is not null ? packagePaths[1] : null;
             var pfxPath = version.Certificate?.Pfx is not null ? packagePaths[2] : null;
 
-            if (request.PreserveData)
+            if (backupData)
             {
                 const string message = "Backing up worlds and packs";
                 reporter.Report(InstallationState.BackingUp, message);
@@ -97,7 +110,7 @@ public sealed class InstallationService(
             reporter.CanCancel = false;
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (existing is not null)
+            if (removeExisting)
             {
                 const string message = "Removing the current Minecraft version";
                 reporter.Report(InstallationState.RemovingExistingVersion, message);
@@ -119,7 +132,7 @@ public sealed class InstallationService(
             {
                 const string message = "Restoring worlds and packs";
                 reporter.Report(InstallationState.RestoringData, message);
-                await Task.Run(() => backupService.Restore(backupPath, reporter.For(InstallationState.RestoringData, message)), CancellationToken.None);
+                await Task.Run(() => backupService.Restore(backupPath, version.Format, reporter.For(InstallationState.RestoringData, message)), CancellationToken.None);
             }
 
             reporter.Report(InstallationState.Finalizing, "Finishing up");
@@ -267,5 +280,8 @@ public sealed class InstallationService(
         }
     }
 }
+
+public sealed class GamingServicesMissingException() : Exception(
+    "This version needs Xbox Gaming Services. Install it from the Microsoft Store, then try again.");
 
 public sealed class InstallationException(string message, Exception innerException) : Exception(message, innerException);

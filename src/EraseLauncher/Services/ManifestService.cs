@@ -6,7 +6,14 @@ namespace EraseLauncher.Services;
 
 public sealed class ManifestService(HttpClient httpClient, LoggingService log, string? manifestUrl = null)
 {
-    public const string ManifestUrl = "https://cdn.erasemc.com/manifest.json";
+    // Schema 2 adds GDK builds, which older launchers cannot install, so it is served from
+    // its own path and the schema 1 manifest stays valid for launchers already in use.
+    public const string ManifestUrl = "https://cdn.erasemc.com/v2/manifest.json";
+    public const int SchemaVersion = 2;
+
+    // GDK packages are only published by Microsoft's Xbox CDN, which serves them over plain
+    // HTTP. They are still pinned to a SHA-256 in the manifest before anything is installed.
+    private static readonly string[] MsixvcHosts = ["assets1.xboxlive.com", "assets2.xboxlive.com"];
     private readonly string _manifestUrl = manifestUrl ?? ManifestUrl;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -30,7 +37,7 @@ public sealed class ManifestService(HttpClient httpClient, LoggingService log, s
 
     public static void Validate(VersionManifest manifest)
     {
-        if (manifest.SchemaVersion != 1)
+        if (manifest.SchemaVersion is < 1 or > SchemaVersion)
         {
             throw new ManifestValidationException("Unsupported manifest schema.");
         }
@@ -53,7 +60,12 @@ public sealed class ManifestService(HttpClient httpClient, LoggingService log, s
                 throw new ManifestValidationException($"Version {version.Id} has no display name.");
             }
 
-            ValidateArtifact(version.Package, $"package for {version.Id}");
+            ValidateArtifact(version.Package, $"package for {version.Id}", allowXboxCdn: version.Format == PackageFormat.Msixvc);
+            if (version.Format == PackageFormat.Msixvc && version.Certificate is not null)
+            {
+                throw new ManifestValidationException($"The GDK build {version.Id} cannot carry a sideloading certificate.");
+            }
+
             if (version.Certificate is not null)
             {
                 ValidateArtifact(version.Certificate, $"certificate for {version.Id}");
@@ -66,11 +78,15 @@ public sealed class ManifestService(HttpClient httpClient, LoggingService log, s
             foreach (var dependency in version.Dependencies)
             {
                 ValidateArtifact(dependency, $"dependency for {version.Id}");
+                if (dependency.MinVersion is not null && !Version.TryParse(dependency.MinVersion, out _))
+                {
+                    throw new ManifestValidationException($"A dependency for {version.Id} has an invalid minimum version.");
+                }
             }
         }
     }
 
-    private static void ValidateArtifact(DownloadArtifact artifact, string description)
+    private static void ValidateArtifact(DownloadArtifact artifact, string description, bool allowXboxCdn = false)
     {
         if (artifact.Size <= 0 || string.IsNullOrWhiteSpace(artifact.FileName) ||
             artifact.FileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || artifact.FileName.Contains(Path.DirectorySeparatorChar) ||
@@ -79,7 +95,7 @@ public sealed class ManifestService(HttpClient httpClient, LoggingService log, s
             throw new ManifestValidationException($"The {description} has invalid metadata.");
         }
 
-        if (artifact.Urls.Count == 0 || artifact.Urls.Any(url => !Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps))
+        if (artifact.Urls.Count == 0 || artifact.Urls.Any(url => !IsAllowedSource(url, allowXboxCdn)))
         {
             throw new ManifestValidationException($"The {description} has no valid HTTPS source.");
         }
@@ -89,6 +105,11 @@ public sealed class ManifestService(HttpClient httpClient, LoggingService log, s
             throw new ManifestValidationException($"The {description} has an invalid SHA-256 hash.");
         }
     }
+
+    private static bool IsAllowedSource(string url, bool allowXboxCdn) =>
+        Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
+        (uri.Scheme == Uri.UriSchemeHttps ||
+         allowXboxCdn && uri.Scheme == Uri.UriSchemeHttp && MsixvcHosts.Contains(uri.Host, StringComparer.OrdinalIgnoreCase));
 }
 
 public sealed class ManifestValidationException(string message) : Exception(message);

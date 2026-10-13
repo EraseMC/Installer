@@ -50,6 +50,9 @@ public sealed class CoreServiceTests
     [InlineData("1.16.10004.0", "1.16.100", true)]
     [InlineData("1.18.12001.0", "1.18.12", true)]
     [InlineData("1.18.12.1", "1.16.100", false)]
+    [InlineData("1.21.5007.0", "1.21.50", true)]
+    [InlineData("1.26.5203.0", "1.26.52", true)]
+    [InlineData("1.26.5101.0", "1.26.52", false)]
     public void Minecraft_build_comparison_uses_major_minor_build(string installed, string requested, bool expected) =>
         Assert.Equal(expected, VersionService.MatchesMinecraftBuild(Version.Parse(installed), requested));
 

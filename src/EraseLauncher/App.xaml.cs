@@ -52,6 +52,7 @@ public partial class App : Application
             minecraftService,
             new SettingsService(),
             new InstallationService(new DownloadService(httpClient, new HashService(), log), packageService, minecraftService, new BackupService(), log),
+            new ServerListService(log),
             log);
 
         var window = new Views.MainWindow { DataContext = viewModel };

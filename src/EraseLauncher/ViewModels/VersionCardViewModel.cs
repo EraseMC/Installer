@@ -9,6 +9,11 @@ public sealed class VersionCardViewModel(MinecraftVersion version) : ObservableO
     public MinecraftVersion Version { get; } = version;
     public string Id => Version.Id;
     public string DisplayName => Version.DisplayName;
+    public bool IsGdk => Version.Format == PackageFormat.Msixvc;
+
+    public string Subtitle => IsGdk
+        ? $"{Version.DisplayName}  ·  GDK, needs your Minecraft licence"
+        : Version.DisplayName;
     public long DownloadSize => Version.Package.Size + Version.Dependencies.Sum(dependency => dependency.Size);
     public string SizeText => Format.Bytes(DownloadSize);
 

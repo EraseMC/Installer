@@ -30,6 +30,39 @@ public sealed class ManifestServiceTests
     }
 
     [Fact]
+    public void Gdk_build_may_use_the_xbox_cdn_over_http()
+    {
+        var version = CreateVersion("1.26.52", PackageFormat.Msixvc);
+        version.Package.Urls[0] = "http://assets1.xboxlive.com/Z/build/Microsoft.MinecraftUWP_1.26.5203.0_x64__8wekyb3d8bbwe.msixvc";
+
+        ManifestService.Validate(new VersionManifest { SchemaVersion = 2, Versions = [version] });
+    }
+
+    [Theory]
+    [InlineData("http://example.com/minecraft.msixvc", PackageFormat.Msixvc)]
+    [InlineData("http://assets1.xboxlive.com/minecraft.appx", PackageFormat.Appx)]
+    public void Http_is_rejected_outside_the_xbox_cdn_and_gdk_builds(string url, PackageFormat format)
+    {
+        var version = CreateVersion("1.26.52", format);
+        version.Package.Urls[0] = url;
+
+        Assert.Throws<ManifestValidationException>(() => ManifestService.Validate(new VersionManifest { SchemaVersion = 2, Versions = [version] }));
+    }
+
+    [Fact]
+    public void Unknown_schema_is_rejected() =>
+        Assert.Throws<ManifestValidationException>(() => ManifestService.Validate(new VersionManifest { SchemaVersion = 3, Versions = [CreateVersion("1.16.100")] }));
+
+    [Fact]
+    public void Package_format_is_parsed_from_json()
+    {
+        const string json = "{\"id\":\"1.26.52\",\"displayName\":\"x\",\"format\":\"msixvc\",\"package\":{\"fileName\":\"a\",\"sha256\":\"b\"}}";
+        var version = System.Text.Json.JsonSerializer.Deserialize<MinecraftVersion>(json)!;
+
+        Assert.Equal(PackageFormat.Msixvc, version.Format);
+    }
+
+    [Fact]
     public void Manifest_with_duplicate_versions_is_rejected()
     {
         Assert.Throws<ManifestValidationException>(() => ManifestService.Validate(new VersionManifest
@@ -52,9 +85,10 @@ public sealed class ManifestServiceTests
         Assert.Equal("1.16.100", manifest.Versions[0].Id);
     }
 
-    private static MinecraftVersion CreateVersion(string id) => new()
+    private static MinecraftVersion CreateVersion(string id, PackageFormat format = PackageFormat.Appx) => new()
     {
         Id = id,
+        Format = format,
         DisplayName = "Minecraft Bedrock " + id,
         Package = new DownloadArtifact
         {

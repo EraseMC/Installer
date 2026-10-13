@@ -13,11 +13,22 @@ namespace EraseLauncher.Services;
 public sealed class PackageService(PowerShellRunner powerShell, LoggingService log)
 {
     public const string MinecraftFamilyName = "Microsoft.MinecraftUWP_8wekyb3d8bbwe";
+    public const string GamingServicesFamilyName = "Microsoft.GamingServices_8wekyb3d8bbwe";
+    public const string GamingServicesStoreUri = "ms-windows-store://pdp/?productid=9MWPM2CQNLHN";
 
     private readonly PackageManager _packageManager = new();
 
-    public Task<bool> IsInstalledAsync(string packageFamilyName, CancellationToken cancellationToken) =>
-        Task.Run(() => _packageManager.FindPackagesForUser(string.Empty, packageFamilyName).Any(), cancellationToken);
+    /// <summary>True when the family is installed at <paramref name="minVersion"/> or newer.</summary>
+    public Task<bool> IsInstalledAsync(string packageFamilyName, string? minVersion, CancellationToken cancellationToken) =>
+        Task.Run(() =>
+        {
+            var required = minVersion is null ? null : Version.Parse(minVersion);
+            return _packageManager.FindPackagesForUser(string.Empty, packageFamilyName).Any(package =>
+            {
+                var version = package.Id.Version;
+                return required is null || new Version(version.Major, version.Minor, version.Build, version.Revision) >= required;
+            });
+        }, cancellationToken);
 
     public Task<Windows.ApplicationModel.Package?> FindMinecraftAsync(CancellationToken cancellationToken) =>
         Task.Run(() => _packageManager.FindPackagesForUser(string.Empty, MinecraftFamilyName).FirstOrDefault(), cancellationToken);
@@ -58,7 +69,11 @@ public sealed class PackageService(PowerShellRunner powerShell, LoggingService l
     public async Task InstallPackageAsync(string path, bool isMinecraft, IProgress<double>? progress, CancellationToken cancellationToken)
     {
         // Frameworks such as VCLibs are shared with other apps, so they are never force-closed.
-        var options = isMinecraft ? DeploymentOptions.ForceTargetApplicationShutdown : DeploymentOptions.None;
+        // Minecraft may be replaced by an older build in place (a GDK downgrade), so it
+        // accepts any installed version.
+        var options = isMinecraft
+            ? DeploymentOptions.ForceTargetApplicationShutdown | DeploymentOptions.ForceUpdateFromAnyVersion
+            : DeploymentOptions.None;
         await log.InfoAsync($"Deploying {Path.GetFileName(path)}.", cancellationToken);
         await RunDeploymentAsync(_packageManager.AddPackageAsync(new Uri(path), null, options), progress, cancellationToken);
     }

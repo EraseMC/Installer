@@ -36,7 +36,7 @@ Data preservation intentionally backs up the relevant `LocalState\games\com.moja
 
 ## Manifest schema
 
-The client accepts schema version `1`. Each version is dynamic and must supply its own package metadata; the UI does not manufacture fallback version data.
+The launcher reads schema version `2` from `https://cdn.erasemc.com/v2/manifest.json`. Schema `2` adds GDK builds, which launchers released before it cannot install, so the schema `1` manifest at `/manifest.json` stays in place for them and only lists APPX builds. Each version is dynamic and must supply its own package metadata; the UI does not manufacture fallback version data.
 
 ```json
 {
@@ -61,13 +61,31 @@ The client accepts schema version `1`. Each version is dynamic and must supply i
 }
 ```
 
-Every URL must be HTTPS, every filename must be a filename only (not a path), and every SHA-256 value must be exactly 64 hexadecimal characters. Invalid manifests fail closed.
+Schema `2` adds two optional fields:
+
+- `format` on a version: `appx` (the default) or `msixvc` for a GDK build. A GDK build has no certificate.
+- `minVersion` on a dependency: the oldest installed version that satisfies it.
+
+Every URL must be HTTPS, every filename must be a filename only (not a path), and every SHA-256 value must be exactly 64 hexadecimal characters. The single exception is a GDK package: Microsoft only publishes those on `assets1.xboxlive.com` and `assets2.xboxlive.com` over plain HTTP, so those two hosts are accepted for `msixvc` packages. The pinned SHA-256 still has to match before anything is installed. Invalid manifests fail closed.
+
+## GDK builds
+
+Minecraft moved from UWP to the Microsoft GDK in 1.21.120. GDK packages are encrypted `.msixvc` files tied to the account's licence, so they are never mirrored on the Erase CDN. They share the `Microsoft.MinecraftUWP_8wekyb3d8bbwe` family with the UWP builds, so only one build is installed at a time:
+
+- GDK to GDK replaces the package in place (`ForceUpdateFromAnyVersion`); game data under `%AppData%\Minecraft Bedrock` is untouched.
+- Any switch that involves a UWP build removes the installed package first. That deletes the UWP `LocalState`, which is why the optional backup runs only in this case. A backup restored onto a GDK build goes to `Users\Shared\games\com.mojang`, without the UWP settings folder.
+
+Installing a GDK build requires Xbox Gaming Services; when it is missing the installation stops before downloading and the launcher opens its Store page. A GDK install is recognised by the `MicrosoftGame.config` file in the package folder, and the game is launched through the package's own app-list entry, because GDK and UWP builds use different application ids.
+
+## Server list
+
+Before every launch the launcher makes sure `erasemc.com:19132` is in `external_servers.txt`: in the UWP package's `LocalState`, and in each GDK account folder under `%AppData%\Minecraft Bedrock\Users`. When the server is missing it is added as the first entry and the others move down; an existing entry, under any name, is left untouched.
 
 ## CDN and deployment
 
 The production endpoint is `https://cdn.erasemc.com/manifest.json`; normal installation never uses GitHub. CDN payloads are external deployment artifacts and are intentionally not committed to this repository.
 
-The CDN is served by Nginx with HTTPS, automatic certificate renewal and byte-range support. Its payloads and manifest are deployment artifacts, not repository files. The live manifest lists Minecraft Bedrock `1.16.100` and `1.18.12`, with their package, certificate and prerequisite hashes generated from the deployed files.
+The CDN is served by Nginx with HTTPS, automatic certificate renewal and byte-range support. Its payloads and manifest are deployment artifacts, not repository files. The live manifests list Minecraft Bedrock `1.16.100`, `1.18.12` and `1.21.50`; the schema `2` manifest also lists the GDK build `1.26.52`. Package, certificate and prerequisite hashes are generated from the deployed files and, for GDK, from the file Microsoft serves.
 
 The live deployment uses public `.cer` signing certificates only. A `.pfx` is optional in the client schema, but private-key material must not be published to the CDN or committed to source control. Each deployment must validate the JSON, run `nginx -t`, and verify the public manifest and a ranged package response before it is considered ready.
 

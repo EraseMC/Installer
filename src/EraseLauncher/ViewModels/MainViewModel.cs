@@ -31,6 +31,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly MinecraftService _minecraftService;
     private readonly SettingsService _settingsService;
     private readonly InstallationService _installationService;
+    private readonly ServerListService _serverListService;
     private readonly LoggingService _log;
     private CancellationTokenSource? _installationCancellation;
     private MinecraftInstallation? _installation;
@@ -57,12 +58,14 @@ public sealed class MainViewModel : ObservableObject
         MinecraftService minecraftService,
         SettingsService settingsService,
         InstallationService installationService,
+        ServerListService serverListService,
         LoggingService log)
     {
         _manifestService = manifestService;
         _minecraftService = minecraftService;
         _settingsService = settingsService;
         _installationService = installationService;
+        _serverListService = serverListService;
         _log = log;
 
         NavigateCommand = new RelayCommand<LauncherPage>(Navigate);
@@ -73,7 +76,7 @@ public sealed class MainViewModel : ObservableObject
         RetryInstallCommand = new RelayCommand(() => _ = InstallAsync(), () => SelectedVersion is not null && !IsBusy);
         FinishInstallCommand = new RelayCommand(FinishInstallSession, () => !IsBusy);
         RefreshCommand = new RelayCommand(() => _ = RefreshAsync(), () => !IsBusy && ManifestState != ManifestState.Loading);
-        PlayCommand = new RelayCommand(Play, () => HasInstalledMinecraft && !IsBusy);
+        PlayCommand = new RelayCommand(() => _ = PlayAsync(), () => HasInstalledMinecraft && !IsBusy);
         OpenDiscordCommand = new RelayCommand(() => OpenUrl(DiscordUrl));
         OpenLauncherFolderCommand = new RelayCommand(() => OpenFolder(AppPaths.Root));
         OpenLogsFolderCommand = new RelayCommand(() => OpenFolder(AppPaths.Logs));
@@ -485,6 +488,11 @@ public sealed class MainViewModel : ObservableObject
             InstallOutcome = InstallOutcome.Failed;
             InstallationTitle = "Installation failed";
             InstallationDetail = exception.Message;
+            if (exception.InnerException is GamingServicesMissingException)
+            {
+                OpenUrl(PackageService.GamingServicesStoreUri);
+            }
+
             await RefreshMinecraftAsync();
         }
         finally
@@ -510,7 +518,7 @@ public sealed class MainViewModel : ObservableObject
 
         if (_settings.LaunchAfterInstall && HasInstalledMinecraft)
         {
-            Play();
+            await PlayAsync();
         }
     }
 
@@ -597,11 +605,14 @@ public sealed class MainViewModel : ObservableObject
         CurrentPage = LauncherPage.Home;
     }
 
-    private void Play()
+    private async Task PlayAsync()
     {
         try
         {
-            _minecraftService.Launch();
+            // Re-checked on every launch: the game rewrites the list, and GDK account
+            // folders only appear after an account has played once.
+            await _serverListService.EnsureEraseServerAsync();
+            await _minecraftService.LaunchAsync();
         }
         catch (Exception exception)
         {

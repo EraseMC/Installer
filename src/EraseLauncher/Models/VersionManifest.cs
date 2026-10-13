@@ -19,6 +19,13 @@ public sealed class MinecraftVersion
     [JsonPropertyName("displayName")]
     public required string DisplayName { get; init; }
 
+    /// <summary>
+    /// How the build is packaged. Legacy UWP builds are sideloadable APPX files; GDK builds
+    /// (1.21.120 and newer) are encrypted MSIXVC files that need Gaming Services and a licence.
+    /// </summary>
+    [JsonPropertyName("format")]
+    public PackageFormat Format { get; init; } = PackageFormat.Appx;
+
     [JsonPropertyName("package")]
     public required DownloadArtifact Package { get; init; }
 
@@ -54,4 +61,15 @@ public sealed class DependencyArtifact : DownloadArtifact
 {
     [JsonPropertyName("packageFamilyName")]
     public string? PackageFamilyName { get; init; }
+
+    /// <summary>Oldest installed version that satisfies the dependency; any version does when empty.</summary>
+    [JsonPropertyName("minVersion")]
+    public string? MinVersion { get; init; }
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<PackageFormat>))]
+public enum PackageFormat
+{
+    Appx,
+    Msixvc
 }

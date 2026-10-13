@@ -345,7 +345,7 @@
                                                 </Border>
                                                 <StackPanel Grid.Column="1" Margin="16,0,0,0" VerticalAlignment="Center">
                                                     <TextBlock Text="{Binding Id}" Style="{StaticResource Text.Base}" FontFamily="{StaticResource Font.Mono}" FontSize="19" FontWeight="SemiBold" />
-                                                    <TextBlock Text="{Binding DisplayName}" Style="{StaticResource Text.Body}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                                    <TextBlock Text="{Binding Subtitle}" Style="{StaticResource Text.Body}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
                                                 </StackPanel>
                                                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,16,0">
                                                     <Border Style="{StaticResource Chip.Accent}" Margin="0,0,8,0"

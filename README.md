@@ -6,21 +6,31 @@ It is not affiliated with, endorsed by, or provided by Mojang, Microsoft, or Min
 
 ## What it does
 
-- Gets its supported-version list from `https://cdn.erasemc.com/manifest.json`.
+- Gets its supported-version list from `https://cdn.erasemc.com/v2/manifest.json`.
 - Downloads packages through HTTPS mirrors with retry and fallback support.
 - Verifies every downloaded artifact with SHA-256 before package changes begin.
 - Backs up Minecraft worlds and packs when the user opts in.
 - Installs the required certificate, dependencies and APPX through explicit Windows package operations.
-- Detects the installed Minecraft package and can launch it through Windows AppsFolder.
+- Installs GDK builds from Microsoft's Xbox CDN through Gaming Services, pinned to a SHA-256 like every other download.
+- Adds the Erase server (`erasemc.com:19132`) to Minecraft's server list before every launch.
+- Detects the installed Minecraft package and launches it.
 
 ## Supported versions
 
-The target production builds are Minecraft Bedrock `1.16.100` and `1.18.12`. Available versions are supplied dynamically by the Erase CDN; the launcher deliberately does not show unverified, hardcoded fallback entries.
+| Version | Package | Notes |
+|---|---|---|
+| `1.16.100` | UWP APPX | Sideloaded with the Erase package certificate |
+| `1.18.12` | UWP APPX | Sideloaded with the Erase package certificate |
+| `1.21.50` | UWP APPX | Signed by Microsoft, no extra certificate |
+| `1.26.52` | GDK MSIXVC | Downloaded from Microsoft; needs Gaming Services and a Minecraft licence on the signed-in account |
+
+Available versions are supplied dynamically by the Erase CDN; the launcher deliberately does not show unverified, hardcoded fallback entries.
 
 ## Requirements
 
 - Windows 10 or Windows 11, x64
-- Internet access to `cdn.erasemc.com`
+- Internet access to `cdn.erasemc.com` (and to `assets1.xboxlive.com` for GDK builds)
+- Xbox Gaming Services and a Minecraft licence for GDK builds
 - Permission to approve Windows UAC once, when the package certificate is not yet trusted
 
 ## Installation
