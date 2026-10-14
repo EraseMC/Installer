@@ -98,3 +98,15 @@ dotnet publish src/EraseLauncher -c Release -r win-x64 --self-contained true -o 
 ```
 
 Single-file publishing is enabled because no app-local native payload has been added. The release must be smoke-tested on a Windows machine without the .NET SDK before publishing to GitHub.
+
+## Erase Client
+
+Erase Client (`client/`) is a C++20 DLL loaded into `Minecraft.Windows.exe`. `DllMain` only starts a thread; everything else runs from `client::run`, which loads the config, installs the hooks and waits for an unload request.
+
+- **Rendering.** The client creates throwaway D3D11 and D3D12 swap chains to find DXGI's `Present`, `Present1`, `ResizeBuffers` and `ResizeBuffers1`, and hooks them with MinHook. On the first frame it picks a backend from the game's swap chain: D3D11 (1.16.100) or D3D12 (RenderDragon builds). D3D12 work must go to the queue the game presents on, which is taken from the swap chain or, failing that, from the game's first `ExecuteCommandLists` call on a direct queue.
+- **Input.** The game window is subclassed. Messages are queued for the render thread, which owns ImGui, so ImGui is never touched from the UI thread. While the menu is open, keyboard, mouse, pointer and raw input are kept from the game. UWP builds deliver the mouse as pointer messages in screen coordinates; both forms are handled.
+- **Platform.** A process in an AppContainer is a UWP build, any other is GDK. The game version comes from the package version (`1.21.5003.0` is `1.21.50`). Config and logs live in the package's `RoamingState\EraseClient`, which both platforms can write to.
+- **Window title.** UWP titles are set through `ApplicationView` on the UI thread. GDK titles are set with `WM_SETTEXT` and checked every second, because the game may write its own back.
+- **Modules.** A `Module` has a name, an enabled state, an optional key binding and a `render` method that draws on the HUD. Every module method runs on the render thread. Settings are stored under `modules.<name>` in `config.json` and written whenever the menu closes and on unload.
+
+Unloading closes the menu, lets the render thread tear down ImGui on its next frame, restores the window procedure, removes the hooks, saves the config and frees the DLL.

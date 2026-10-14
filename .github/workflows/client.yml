@@ -1,0 +1,47 @@
+name: client
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - client/**
+      - src/EraseLauncher/Assets/Fonts/**
+      - .github/workflows/client.yml
+      - .github/matchers/msvc.json
+  pull_request:
+    branches: [main]
+    paths:
+      - client/**
+      - src/EraseLauncher/Assets/Fonts/**
+      - .github/workflows/client.yml
+      - .github/matchers/msvc.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Compiler errors become annotations, which can be read without opening the full log.
+      - name: Register compiler problem matcher
+        run: echo "::add-matcher::.github/matchers/msvc.json"
+      - name: Configure
+        run: cmake -S client -B client/build -A x64
+      - name: Build
+        run: cmake --build client/build --config Release --parallel
+      - name: Collect
+        run: |
+          New-Item -ItemType Directory -Force artifacts/client | Out-Null
+          Copy-Item client/build/Release/EraseClient.dll, client/build/Release/EraseClient.pdb artifacts/client/
+          Copy-Item client/LICENSE artifacts/client/LICENSE.txt
+          Copy-Item client/THIRD_PARTY_NOTICES.md artifacts/client/
+      - name: Upload client
+        uses: actions/upload-artifact@v4
+        with:
+          name: EraseClient-win-x64
+          path: artifacts/client
+          if-no-files-found: error
+          retention-days: 30

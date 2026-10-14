@@ -23,3 +23,6 @@ backups/
 *.key
 *.pem
 appsettings.Development.json
+
+# Client build output
+client/build/
