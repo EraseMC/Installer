@@ -227,6 +227,8 @@
                                                 </StackPanel>
                                             </Button>
                                         </StackPanel>
+                                        <TextBlock Text="{Binding LaunchStatus}" Style="{StaticResource Text.Body}" FontSize="13" Margin="0,12,0,0"
+                                                   Visibility="{Binding HasLaunchStatus, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                     </StackPanel>
                                 </Grid>
                             </Grid>
@@ -461,6 +463,13 @@
                                         <StackPanel>
                                             <TextBlock Text="Open Discord after the first install" Style="{StaticResource Text.Base}" FontWeight="Medium" />
                                             <TextBlock Text="Join the Erase community once Minecraft is ready." Style="{StaticResource Text.Body}" Margin="0,2,0,0" />
+                                        </StackPanel>
+                                    </CheckBox>
+                                    <Rectangle Height="1" Fill="{StaticResource Brush.Line}" Margin="0,16" />
+                                    <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding LoadClient}">
+                                        <StackPanel>
+                                            <TextBlock Text="Load Erase Client" Style="{StaticResource Text.Base}" FontWeight="Medium" />
+                                            <TextBlock Text="Add the in-game menu and HUD when Minecraft starts. Right Shift opens the menu." Style="{StaticResource Text.Body}" Margin="0,2,0,0" />
                                         </StackPanel>
                                     </CheckBox>
                                 </StackPanel>

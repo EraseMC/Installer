@@ -47,6 +47,11 @@ public sealed class ManifestService(HttpClient httpClient, LoggingService log, s
             throw new ManifestValidationException("The manifest contains no versions.");
         }
 
+        if (manifest.Client is not null)
+        {
+            ValidateArtifact(manifest.Client, "Erase Client");
+        }
+
         var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var version in manifest.Versions)
         {

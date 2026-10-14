@@ -14,6 +14,7 @@ It is not affiliated with, endorsed by, or provided by Mojang, Microsoft, or Min
 - Installs GDK builds from Microsoft's Xbox CDN through Gaming Services, pinned to a SHA-256 like every other download.
 - Adds the Erase server (`erasemc.com:19132`) to Minecraft's server list before every launch.
 - Detects the installed Minecraft package and launches it.
+- Optionally loads Erase Client, the in-game menu and HUD, into Minecraft after launch.
 
 ## Supported versions
 
@@ -67,7 +68,9 @@ More detail, including the manifest contract and safe installation sequence, is 
 
 ## Erase Client
 
-`client/` holds Erase Client, a DLL that draws an in-game menu and HUD modules on top of Minecraft. It is in early development: the launcher does not load it yet. The client is licensed under the GNU AGPL v3 (`client/LICENSE`), and the libraries it bundles are listed in `client/THIRD_PARTY_NOTICES.md`.
+`client/` holds Erase Client, a DLL that draws an in-game menu and HUD modules on top of Minecraft. It is in early development. When **Load Erase Client** is on in the launcher settings, Play loads it into Minecraft once the game has started. The client is licensed under the GNU AGPL v3 (`client/LICENSE`), and the libraries it bundles are listed in `client/THIRD_PARTY_NOTICES.md`.
+
+To try a development build, put `EraseClient.dll` next to `EraseLauncher.exe`; it is used instead of the build the manifest offers.
 
 It is built by the `client` GitHub Actions workflow on every push that touches it; the DLL and its PDB are attached to the run as the `EraseClient-win-x64` artifact. A local build needs Visual Studio 2022 with the C++ workload and CMake 3.25+:
 
@@ -78,7 +81,9 @@ cmake --build client/build --config Release
 
 ## Integrity and privacy
 
-The launcher does not execute downloaded code. It downloads package files, compares SHA-256 checksums against a validated manifest, and only then asks Windows to perform documented APPX and certificate operations. It does not disable security features or add antivirus exclusions.
+The launcher downloads package files, compares SHA-256 checksums against a validated manifest, and only then asks Windows to perform documented APPX and certificate operations. It does not disable security features or add antivirus exclusions.
+
+The one piece of downloaded code it runs is Erase Client: with **Load Erase Client** on, the client DLL named in the manifest is downloaded, checked against its SHA-256 like every other file, and loaded into Minecraft. Turning the setting off launches the game untouched.
 
 Local cache, backups, settings and logs are stored under `%LocalAppData%\EraseLauncher`. Certificates, PFX files, credentials, build output and logs are excluded from source control.
 

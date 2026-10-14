@@ -46,13 +46,15 @@ public partial class App : Application
         httpClient.DefaultRequestHeaders.UserAgent.ParseAdd($"EraseLauncher/{version}");
 
         var packageService = new PackageService(new PowerShellRunner(log), log);
+        var downloadService = new DownloadService(httpClient, new HashService(), log);
         var minecraftService = new MinecraftService(packageService);
         var viewModel = new MainViewModel(
             new ManifestService(httpClient, log),
             minecraftService,
             new SettingsService(),
-            new InstallationService(new DownloadService(httpClient, new HashService(), log), packageService, minecraftService, new BackupService(), log),
+            new InstallationService(downloadService, packageService, minecraftService, new BackupService(), log),
             new ServerListService(log),
+            new ClientService(downloadService, log),
             log);
 
         var window = new Views.MainWindow { DataContext = viewModel };

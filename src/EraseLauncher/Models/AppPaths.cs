@@ -6,6 +6,7 @@ public static class AppPaths
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EraseLauncher");
 
     public static string Cache { get; } = Path.Combine(Root, "Cache");
+    public static string Client { get; } = Path.Combine(Root, "Client");
     public static string Backups { get; } = Path.Combine(Root, "Backups");
     public static string Logs { get; } = Path.Combine(Root, "Logs");
     public static string Settings { get; } = Path.Combine(Root, "settings.json");

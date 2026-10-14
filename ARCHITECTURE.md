@@ -65,6 +65,7 @@ Schema `2` adds two optional fields:
 
 - `format` on a version: `appx` (the default) or `msixvc` for a GDK build. A GDK build has no certificate.
 - `minVersion` on a dependency: the oldest installed version that satisfies it.
+- `client` at the top level: the Erase Client DLL (`fileName`, `urls`, `sha256`, `size`), validated like any other artifact.
 
 Every URL must be HTTPS, every filename must be a filename only (not a path), and every SHA-256 value must be exactly 64 hexadecimal characters. The single exception is a GDK package: Microsoft only publishes those on `assets1.xboxlive.com` and `assets2.xboxlive.com` over plain HTTP, so those two hosts are accepted for `msixvc` packages. The pinned SHA-256 still has to match before anything is installed. Invalid manifests fail closed.
 
@@ -108,5 +109,11 @@ Erase Client (`client/`) is a C++20 DLL loaded into `Minecraft.Windows.exe`. `Dl
 - **Platform.** A process in an AppContainer is a UWP build, any other is GDK. The game version comes from the package version (`1.21.5003.0` is `1.21.50`). Config and logs live in the package's `RoamingState\EraseClient`, which both platforms can write to.
 - **Window title.** UWP titles are set through `ApplicationView` on the UI thread. GDK titles are set with `WM_SETTEXT` and checked every second, because the game may write its own back.
 - **Modules.** A `Module` has a name, an enabled state, an optional key binding and a `render` method that draws on the HUD. Every module method runs on the render thread. Settings are stored under `modules.<name>` in `config.json` and written whenever the menu closes and on unload.
+
+### Loading the client
+
+On Play, with **Load Erase Client** on, `ClientService` takes `EraseClient.dll` from next to the launcher (a development build) or downloads and verifies the manifest's `client` artifact. The DLL is copied to `%LocalAppData%\EraseLauncher\Client\<hash>\EraseClient.dll`: a DLL Minecraft still has loaded is locked, so every build gets its own folder. The copy is readable by `ALL APPLICATION PACKAGES` and `ALL RESTRICTED APPLICATION PACKAGES`; without that, a UWP build in its AppContainer cannot load it.
+
+After launching the game, the launcher waits for `Minecraft.Windows.exe` and for it to load `dxgi.dll`, then runs `LoadLibraryW` on a remote thread and checks that the module appeared. It does nothing if the client is already loaded, and the DLL itself refuses a second copy in the same game. When the client cannot be prepared or loaded, the game still starts and the reason goes to the launcher log.
 
 Unloading closes the menu, lets the render thread tear down ImGui on its next frame, restores the window procedure, removes the hooks, saves the config and frees the DLL.

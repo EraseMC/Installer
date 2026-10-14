@@ -9,6 +9,10 @@ public sealed class VersionManifest
 
     [JsonPropertyName("versions")]
     public List<MinecraftVersion> Versions { get; init; } = [];
+
+    /// <summary>The Erase Client DLL loaded into Minecraft on launch. Optional.</summary>
+    [JsonPropertyName("client")]
+    public DownloadArtifact? Client { get; init; }
 }
 
 public sealed class MinecraftVersion

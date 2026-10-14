@@ -32,7 +32,11 @@ public sealed class MainViewModel : ObservableObject
     private readonly SettingsService _settingsService;
     private readonly InstallationService _installationService;
     private readonly ServerListService _serverListService;
+    private readonly ClientService _clientService;
     private readonly LoggingService _log;
+    private DownloadArtifact? _clientArtifact;
+    private bool _isLaunching;
+    private string _launchStatus = string.Empty;
     private CancellationTokenSource? _installationCancellation;
     private MinecraftInstallation? _installation;
     private LauncherPage _currentPage = LauncherPage.Home;
@@ -59,6 +63,7 @@ public sealed class MainViewModel : ObservableObject
         SettingsService settingsService,
         InstallationService installationService,
         ServerListService serverListService,
+        ClientService clientService,
         LoggingService log)
     {
         _manifestService = manifestService;
@@ -66,6 +71,7 @@ public sealed class MainViewModel : ObservableObject
         _settingsService = settingsService;
         _installationService = installationService;
         _serverListService = serverListService;
+        _clientService = clientService;
         _log = log;
 
         NavigateCommand = new RelayCommand<LauncherPage>(Navigate);
@@ -329,6 +335,27 @@ public sealed class MainViewModel : ObservableObject
         set => UpdateSetting(() => _settings.PreserveDataByDefault = value);
     }
 
+    public bool LoadClient
+    {
+        get => _settings.LoadClient;
+        set => UpdateSetting(() => _settings.LoadClient = value);
+    }
+
+    /// <summary>What happened to Erase Client on the last launch; empty when there is nothing to say.</summary>
+    public string LaunchStatus
+    {
+        get => _launchStatus;
+        private set
+        {
+            if (SetProperty(ref _launchStatus, value))
+            {
+                OnPropertyChanged(nameof(HasLaunchStatus));
+            }
+        }
+    }
+
+    public bool HasLaunchStatus => LaunchStatus.Length > 0;
+
     public string CacheSizeText { get => _cacheSizeText; private set => SetProperty(ref _cacheSizeText, value); }
     public string StorageMessage { get => _storageMessage; private set => SetProperty(ref _storageMessage, value); }
 
@@ -338,6 +365,7 @@ public sealed class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(LaunchAfterInstall));
         OnPropertyChanged(nameof(OpenDiscordAfterFirstInstall));
         OnPropertyChanged(nameof(PreserveDataByDefault));
+        OnPropertyChanged(nameof(LoadClient));
         await RefreshAsync();
     }
 
@@ -368,6 +396,7 @@ public sealed class MainViewModel : ObservableObject
         {
             using var timeout = new CancellationTokenSource(ManifestTimeout);
             var manifest = await _manifestService.GetAsync(timeout.Token);
+            _clientArtifact = manifest.Client;
             Versions.Clear();
             foreach (var version in manifest.Versions.OrderByDescending(item => Version.Parse(item.Id)))
             {
@@ -607,16 +636,59 @@ public sealed class MainViewModel : ObservableObject
 
     private async Task PlayAsync()
     {
+        // Loading the client waits for the game to start, so a second click must not start another wait.
+        if (_isLaunching)
+        {
+            return;
+        }
+
+        _isLaunching = true;
         try
         {
             // Re-checked on every launch: the game rewrites the list, and GDK account
             // folders only appear after an account has played once.
             await _serverListService.EnsureEraseServerAsync();
+
+            var client = _settings.LoadClient ? await PrepareClientAsync() : null;
             await _minecraftService.LaunchAsync();
+            if (client is not null)
+            {
+                LaunchStatus = "Loading Erase Client";
+                var loaded = await _clientService.InjectAsync(client, CancellationToken.None);
+                LaunchStatus = loaded ? string.Empty : "Erase Client could not be loaded. The launcher log has the details.";
+            }
         }
         catch (Exception exception)
         {
+            LaunchStatus = string.Empty;
             _ = _log.InfoAsync($"Launch failed: {exception}");
+        }
+        finally
+        {
+            _isLaunching = false;
+        }
+    }
+
+    /// <summary>Returns the client DLL to load, or null to launch the game without it.</summary>
+    private async Task<string?> PrepareClientAsync()
+    {
+        try
+        {
+            LaunchStatus = "Preparing Erase Client";
+            var client = await _clientService.PrepareAsync(_clientArtifact, CancellationToken.None);
+            LaunchStatus = string.Empty;
+            if (client is null)
+            {
+                await _log.InfoAsync("No Erase Client build is available; launching without it.");
+            }
+
+            return client;
+        }
+        catch (Exception exception)
+        {
+            LaunchStatus = "Erase Client could not be prepared. Minecraft starts without it.";
+            await _log.InfoAsync($"Preparing Erase Client failed: {exception}");
+            return null;
         }
     }
 

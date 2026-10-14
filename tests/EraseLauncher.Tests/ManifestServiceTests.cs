@@ -21,6 +21,30 @@ public sealed class ManifestServiceTests
     }
 
     [Fact]
+    public void Client_artifact_is_validated_like_any_download()
+    {
+        static VersionManifest WithClient(string url) => new()
+        {
+            SchemaVersion = 2,
+            Versions = [CreateVersion("1.21.50")],
+            Client = new DownloadArtifact
+            {
+                FileName = "EraseClient.dll",
+                Size = 1024,
+                Sha256 = new string('A', 64),
+                Urls = [url]
+            }
+        };
+
+        ManifestService.Validate(WithClient("https://cdn.erasemc.com/client/EraseClient.dll"));
+        Assert.Throws<ManifestValidationException>(() => ManifestService.Validate(WithClient("http://cdn.erasemc.com/client/EraseClient.dll")));
+    }
+
+    [Fact]
+    public void Client_is_optional() =>
+        Assert.Null(System.Text.Json.JsonSerializer.Deserialize<VersionManifest>("{\"schemaVersion\":2,\"versions\":[]}")!.Client);
+
+    [Fact]
     public void Manifest_with_non_https_source_is_rejected()
     {
         var version = CreateVersion("1.16.100");
