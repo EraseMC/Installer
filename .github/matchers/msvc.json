@@ -4,7 +4,7 @@
       "owner": "msvc",
       "pattern": [
         {
-          "regexp": "^\s*(?:\d+>)?([^\s(][^(]*)\((\d+)(?:,(\d+))?\)\s*:\s+(?:fatal\s+)?(error|warning)\s+(C\d+)\s*:\s*(.*?)(?:\s+\[.*\])?$",
+          "regexp": "^\\s*(?:\\d+>)?([^\\s(][^(]*)\\((\\d+)(?:,(\\d+))?\\)\\s*:\\s+(?:fatal\\s+)?(error|warning)\\s+(C\\d+)\\s*:\\s*(.*?)(?:\\s+\\[.*\\])?$",
           "file": 1,
           "line": 2,
           "column": 3,
@@ -18,7 +18,7 @@
       "owner": "msvc-link",
       "pattern": [
         {
-          "regexp": "^\s*(?:\d+>)?(.*?)\s*:\s+(?:fatal\s+)?(error)\s+(LNK\d+)\s*:\s*(.*?)(?:\s+\[.*\])?$",
+          "regexp": "^\\s*(?:\\d+>)?(.*?)\\s*:\\s+(?:fatal\\s+)?(error)\\s+(LNK\\d+)\\s*:\\s*(.*?)(?:\\s+\\[.*\\])?$",
           "file": 1,
           "severity": 2,
           "code": 3,

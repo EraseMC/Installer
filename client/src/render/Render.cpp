@@ -56,6 +56,7 @@ std::array<ResizeBuffers1Fn, MaxImplementations> g_resizeBuffers1{};
 ExecuteCommandListsFn g_executeCommandLists = nullptr;
 
 std::atomic<ID3D12CommandQueue*> g_queue = nullptr;
+std::atomic<ID3D12Device*> g_device = nullptr;
 std::atomic<HWND> g_window = nullptr;
 std::atomic<bool> g_stopRequested = false;
 std::atomic<bool> g_stopped = false;
@@ -214,6 +215,12 @@ HWND windowOf(IDXGISwapChain* swapChain)
 
 /// Finds the queue a D3D12 swap chain presents on. DXGI hands it out as the swap chain's "device";
 /// if that fails, the first direct queue the game submitted work to is used.
+bool onDevice(ID3D12CommandQueue* queue, ID3D12Device* device)
+{
+    ComPtr<ID3D12Device> queueDevice;
+    return SUCCEEDED(queue->GetDevice(IID_PPV_ARGS(&queueDevice))) && queueDevice.Get() == device;
+}
+
 ComPtr<ID3D12CommandQueue> queueOf(IDXGISwapChain* swapChain)
 {
     ComPtr<ID3D12CommandQueue> queue;
@@ -223,6 +230,30 @@ ComPtr<ID3D12CommandQueue> queueOf(IDXGISwapChain* swapChain)
     }
 
     queue = g_queue.load();
+    if (!queue)
+    {
+        return nullptr;
+    }
+
+    // Drawing on a queue of another device would remove the game's device, so the guess is checked.
+    // From then on only queues of the swap chain's device are captured.
+    ComPtr<ID3D12Device> swapChainDevice;
+    if (SUCCEEDED(swapChain->GetDevice(IID_PPV_ARGS(&swapChainDevice))) && !onDevice(queue.Get(), swapChainDevice.Get()))
+    {
+        ID3D12Device* expectedDevice = nullptr;
+        if (g_device.compare_exchange_strong(expectedDevice, swapChainDevice.Get()))
+        {
+            swapChainDevice->AddRef();
+            log::warn("The captured D3D12 queue belongs to another device; waiting for the right one.");
+        }
+
+        ID3D12CommandQueue* expectedQueue = queue.Get();
+        if (g_queue.compare_exchange_strong(expectedQueue, nullptr))
+        {
+            expectedQueue->Release();
+        }
+        return nullptr;
+    }
     return queue;
 }
 
@@ -231,6 +262,10 @@ void releaseCapturedQueue()
     if (auto* queue = g_queue.exchange(nullptr))
     {
         queue->Release();
+    }
+    if (auto* device = g_device.exchange(nullptr))
+    {
+        device->Release();
     }
 }
 
@@ -519,7 +554,9 @@ HRESULT STDMETHODCALLTYPE resizeBuffers1Hook(IDXGISwapChain3* swapChain, UINT co
 
 void STDMETHODCALLTYPE executeCommandListsHook(ID3D12CommandQueue* queue, UINT count, ID3D12CommandList* const* lists)
 {
-    if (!g_queue.load(std::memory_order_relaxed) && queue->GetDesc().Type == D3D12_COMMAND_LIST_TYPE_DIRECT)
+    auto* device = g_device.load(std::memory_order_relaxed);
+    if (!g_queue.load(std::memory_order_relaxed) && queue->GetDesc().Type == D3D12_COMMAND_LIST_TYPE_DIRECT &&
+        (!device || onDevice(queue, device)))
     {
         ID3D12CommandQueue* expected = nullptr;
         queue->AddRef();
